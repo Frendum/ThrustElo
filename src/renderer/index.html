@@ -1,0 +1,75 @@
+<!DOCTYPE html>
+<html lang="en" data-bs-theme="dark">
+
+<head>
+  <meta charset="UTF-8"> 
+  <title>ThrustElo</title>
+  <link href="./assets/main.css" type="text/css" rel="stylesheet" />
+</head>
+
+<body class="ec-dark">
+  <div class="main">
+    <div id="menu">
+      <div data-target="rankings">Rank</div>
+      <div data-target="history" class="inactive">History</div>
+      <div data-target="duel" class="inactive">Duel</div>
+    </div>
+
+    <div id="tooltips"></div>
+
+    <div class="page" id="rankings">
+      <div class="header">
+        <button type="button" id="update-ranking" class="btn btn-sm btn-success">↻</button><br>
+        <span id="header-ranking"></span>
+      </div>
+      <div class="content">
+        <table class="table">
+          <thead id="rankingtablehead">
+            <tr>
+              <th class="thin" id="favfilter">⭐</th>
+              <th class="thin">📈</th>
+              <th class="thin sortable" data-sort="rank">#<span></span></th>
+              <th class="thin sortable desc" data-sort="elo">Elo<span></span></th>
+              <th id="tablesearchname"><span>Name</span></th>
+              <th class="sortable" data-sort="kills">K<span></span></th>
+              <th class="sortable" data-sort="deaths">D<span></span></th>
+              <th class="sortable" data-sort="kd">K/D<span></span></th>
+              <th class="thin sortable" data-sort="teamKills">TKs<span></span></th>
+            </tr>
+          </thead>
+          <tbody id="rankings-table">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="page" id="history" style="display: none;">
+      <div class="header">
+        <button type="button" id="update-solo" class="btn btn-sm btn-success">↻</button> <button type="button" id="solo-zoom-out" class="btn btn-sm btn-success">Zoom Reset</button> <button type="button" id="solo-zoom-in" class="btn btn-sm btn-success">Last Day</button><br>
+        <span id="header_solo"></span>
+      </div>
+      <canvas class="chart" id="Canvas" role="img"></canvas>
+    </div>
+
+    <div class="page" id="duel" style="display: none;">
+      <div class="header">
+        <input id="searchn" />
+        <ul class="list-group" id="searchndropdown" style="display: none;"></ul>
+        <span id="header_duel"></span><br><span id="segment_duel"></span>
+      </div>
+      <canvas class="chart" id="Canvas_duel" role="img"></canvas>
+    </div>
+
+  </div>
+
+  <div id="footer" style="display: none;"></div>
+
+  <div class="modal-backdrop" id="spinner" style="display: none;"><div class="spinnerbody"><div class="spinner"></div><br><div id="spinnertext">Loading...</div></div><div></div>
+
+  <script>
+    const $ = jQuery = require("jquery")
+    const bootstrap = require('bootstrap')
+  </script>
+  <script type="module" src="./renderer.js"></script>
+</body>
+</html>
