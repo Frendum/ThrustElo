@@ -18,7 +18,7 @@ let player = null;
 let zoomlastday = false;
 let activepage = "rankings"
 
-const drawranking = {
+const ranking = {
   __table: $('#rankings-table'),
   __ranking: null,
   searchterm: null,
@@ -90,10 +90,10 @@ const drawranking = {
         const active = await ipcRenderer.invoke("flipfavorite", player.id)
         $(this).html(active ? "⭐" : "★")
         if(active){
-          drawranking.__favorites.push(player.id);
+          ranking.__favorites.push(player.id);
         }
         else{
-          drawranking.__favorites = drawranking.__favorites.filter((pId) => pId !== player.id);
+          ranking.__favorites = ranking.__favorites.filter((pId) => pId !== player.id);
         }
       });
 
@@ -160,11 +160,9 @@ const drawranking = {
     }
     this.populate();
   },
-  clearsearchterm: function(){
-    this.searchterm = null;
-  },
-  scroll: function(){ 
-    if ($(window).scrollTop() > $(document).height() - $(window).height() - 800 && this.__loaded < this.__resultarray.length && activepage == "rankings") {
+  scroll: function(){
+    if(activepage != "rankings") return;
+    if ($(window).scrollTop() > $(document).height() - $(window).height() - 800 && this.__loaded < this.__resultarray.length) {
       this.populate();
     }
   },
@@ -182,7 +180,7 @@ const drawranking = {
   },
 }
 
-$(window).on('scroll', ()=>{drawranking.scroll()});
+
 
 $("#update-ranking").on("click", () => {
   console.log("update-ranking");
@@ -199,8 +197,8 @@ $("#update-solo").on("click", async () => {
 $("#solo-zoom-out").on("click", () => {setzoomlastday(false)})
 $("#solo-zoom-in").on("click", () => {setzoomlastday(true)})
 
-$("#tablesearchname span").on("click", function(e) {
-  drawranking.search("")
+$("#rankingtablehead #tablesearchname span").on("click", function(e) {
+  ranking.search("")
   
   $(this).html("")
   const input = document.createElement('input')
@@ -220,7 +218,7 @@ $("#tablesearchname span").on("click", function(e) {
   });
 
   $(input).on("input", debounce(() => {
-    drawranking.search(input.value)
+    ranking.search(input.value)
   },500));
 
 
@@ -234,7 +232,7 @@ $("#favfilter").on("click", function() {
   const active = $(this).hasClass('active')
   if(active) $(this).removeClass('active')
   else $(this).addClass('active')
-  drawranking.newdata()
+  ranking.newdata()
 });
 
 $('#rankingtablehead .sortable').on("click", function() {
@@ -250,23 +248,23 @@ $('#rankingtablehead .sortable').on("click", function() {
     dir = -1;
   }
 
-  drawranking.sort([sort, dir])
+  ranking.sort([sort, dir])
 });
 
 const userhistory = async (data, lastday) => {
   changepage('history')
-  console.log(data);
   player = data
   
   chart.resetZoom()
-  clearduel()
   hidetooltip()
   draw(data.data)
   $('head title').text(`ThrustElo | v${version} | ${data.pilotName}`)
-  
+
   if(lastday && zoomlastday == true){
     setzoomlastday(true);
   }
+
+  duel.newdata(data.enemies)
 };
 
 const setzoomlastday = (state) => {
@@ -353,10 +351,10 @@ const draw = (data) => {
   $("#menu div[data-target='duel']").removeClass('inactive');
 }
 
-const drawduel = (target) => {
+const drawduel = (target, avarage) => {
   let data = player.data.filter(item => {
     return ["Death to", "Kill"].includes(item.type)
-    && item.player.name === target[0];
+    && item.player.name === target;
   })
   
   // console.log(data);
@@ -378,9 +376,8 @@ const drawduel = (target) => {
 
   chartduel.data = data;
   chartduel.update();
-  player.target = target;
   segment.updateduel();
-  $('#header_duel').html(`<small>${player.pilotName} vs. ${target[0]} (~${target[2]})</small>`);
+  $('#header_duelgraph').html(`<small>${player.pilotName} vs. ${target} (~${avarage})</small>`);
 }
 
 const drawlines = {
@@ -430,53 +427,169 @@ const segment = {
     const gain = (positive.reduce((a,b) => a+b.elo,0));
     const loss =  Math.abs((negative.reduce((a,b) => a+b.elo,0)));
 
-    $('#segment_duel').html(`<small>Segment: ${data.length} events | Kills ${positive.length} - ${negative.length} | Elo Stolen ${gain} - ${loss}</small>`);
+    $('#segment_duelgraph').html(`<small>Segment: ${data.length} events | Kills ${positive.length} - ${negative.length} | Elo Stolen ${gain} - ${loss}</small>`);
   },
 }
 
-const clearduel = () => {
-  chartduel.data = null;
-  chartduel.update();
-  chartduel.resetZoom();
-  $('#header_duel').text('');
-  $('#searchn').val('');
-};
+const duel = {
+  __table: $('#duel-table'),
+  __enemies: null,
+  searchterm: null,
+  __resultarray: null,
+  __loaded: 0,
+  newdata: function(data){
+    if(data){
+      this.__enemies = data
+    }
 
-$("#searchn").on("keyup click", debounce((event) => {
-  hidetooltip()
-  let search = event.target.value;
-  if(!player || !player.enemies) return;
-  search = search.toLowerCase();
-  const startw = player.enemies.filter((e) => e[0].toLowerCase().startsWith(search));
-  const contai = player.enemies.filter((e) => e[0].toLowerCase().includes(search) && !e[0].toLowerCase().startsWith(search));
-  const resultarr = startw.concat(contai)
-  searchresult(resultarr)
+    $("#dueltablehead th").removeClass("asc desc")
+    $("#dueltablehead th[data-sort='events']").addClass("desc")
+    
+    $("#header_duel").html(`${player.pilotName} vs.`)
+    this.search(this.searchterm)
+  },
+  populate: function(){
+    let i = this.__loaded;
+    const end = i + 100;
 
-}, 350));
+    while(i < end && i < this.__resultarray.length){
+      const player = this.__resultarray[i]
+      const tr = document.createElement('tr')
+  
+      const graph = document.createElement('td')
+      graph.innerHTML = "📈";
+      graph.style.cursor = "pointer";
 
-$("#searchn").on("focusout", () => {
-  if($('#searchndropdown:hover').length == 0){
-    $('#searchndropdown').hide();
+      const events = document.createElement('td')
+      events.innerText = player.events
+
+      const eavarage = document.createElement('td')
+      eavarage.innerText = player.eavarage
+
+      const name = document.createElement('td')
+      name.innerText = player.name
+
+      const k = document.createElement('td')
+      k.innerText = player.k
+
+      const d = document.createElement('td')
+      d.innerText = player.d
+
+      const kd = document.createElement('td')
+      kd.innerText = player.kd
+
+      const netelo = document.createElement('td')
+      netelo.innerText = player.netelo
+
+      $(tr).on('click', async function () {
+        $("#duel-table tr").removeClass("selected");
+        $(tr).addClass("selected");
+      });
+
+      $(graph).on('click', async function () {
+        $("#duel-table tr").removeClass("selected");
+        $(tr).addClass("selected");
+        chartduel.resetZoom()
+        drawduel(player.name, player.eavarage)
+        changepage("duelgraph")
+      });
+
+      tr.append(graph);
+      tr.append(eavarage);
+      tr.append(name);
+      tr.append(events);
+      tr.append(k);
+      tr.append(d);
+      tr.append(kd);
+      tr.append(netelo);
+      this.__table.append(tr);
+
+      i++;
+    }
+
+    this.__loaded = i;
+    this.scroll()
+  },
+  search: function(term){
+    if(term == "" || !term)this.searchterm = null;
+    else this.searchterm = term;
+    
+    this.searchterm = term;
+    this.__table.empty();
+    this.__loaded = 0;
+    this.__resultarray = this.__enemies
+    
+    if(this.searchterm){
+      console.log("searching for ",this.searchterm);
+      this.__resultarray = this.__resultarray.filter((item) => {
+        return item.name.toLowerCase().includes(this.searchterm.toLowerCase());
+      });
+    }
+    this.populate();
+  },
+  scroll: function(){
+    if(activepage != "duel") return;
+    if ($(window).scrollTop() > $(document).height() - $(window).height() - 800 && this.__loaded < this.__resultarray.length) {
+      this.populate();
+    }
+  },
+  sort: function(sortby){
+    this.__table.empty();
+    this.__loaded = 0;
+
+    this.__enemies.sort(function (a, b){
+      if(b[sortby[0]] == null){return -1;}
+      if(a[sortby[0]] == null){return 1;}
+      return (a[sortby[0]]-b[sortby[0]]) * sortby[1];
+    });
+
+    this.search(this.searchterm)
+  },
+}
+
+$('#dueltablehead .sortable').on("click", function() {
+  $(this).siblings().removeClass("asc desc");
+  const sort = $(this).attr("data-sort")
+
+  let dir = 1;
+  if($(this).hasClass('desc')){
+    $(this).addClass("asc").removeClass("desc");
   }
+  else {
+    $(this).addClass("desc").removeClass("asc");
+    dir = -1;
+  }
+
+  duel.sort([sort, dir])
 });
 
-const searchresult = (result) => {
-  const list = $('#searchndropdown')[0]
-  list.replaceChildren()
-  result.forEach(target => {
-    const li = document.createElement('li')
-    li.innerHTML = target[0] + " (~"+target[2]+") | "+ target[1] +" events";
-    li.style.cursor = 'pointer'
-    li.addEventListener("click", () => {
-      $(list).hide()
-      $("#searchn").val(target[0])
-      drawduel(target)
-    })
+$("#dueltablehead #tablesearchname span").on("click", function(e) {
+  duel.search("")
+  
+  $(this).html("")
+  const input = document.createElement('input')
+  input.type = "text";
+  input.placeholder = "Search by name...";
+  input.style.width = "200px";
+  input.style.height = "25px";
 
-    list.appendChild(li)
+  this.appendChild(input);
+  input.focus()
+
+  $(input).on("keydown", (e) => {
+    if(!e.originalEvent.key.match(/[a-zA-Z0-9 ?]/) || !e.which === 13) e.preventDefault();
   });
-  $(list).show()
-}
+
+  $(input).on("input", debounce(() => {
+    duel.search(input.value)
+  },500));
+
+
+  $(input).on("change focusout", () => {
+    if(input.value == "") $(this).html(`<span>Name</span>`);
+    else $(this).html(`<span>"${input.value}"</span>`);
+  });
+});
 
 const solotooltip = debounce((context) => {
   const {chart, tooltip} = context;
@@ -517,22 +630,29 @@ const solotooltip = debounce((context) => {
     title.className = "card-title";
     let text = document.createElement('p');
     text.innerHTML = txt;
+    let close = document.createElement('button');
+    close.innerHTML = "X";
+    close.id = "cls-tooltip";
+    close.classList.add("btn", "btn-success", "btn-sm");
+    close.addEventListener("click", () => {
+      hidetooltip();
+    });
     
     cardBody.appendChild(title);
     cardBody.appendChild(text);
+    cardBody.appendChild(close);
     card.appendChild(cardBody);
     tooltipEl.append(card);
   }
 
-  const {offsetLeft: offsetX, offsetTop: offsetY, width, height } = chart.canvas;
+  const {offsetLeft: offsetX, offsetTop: offsetY } = chart.canvas;
   const {width: twidth, height: theight} = tooltipEl[0].getBoundingClientRect();
-
-  const offset = 30
+  
+  const offset = 20
   let left = offsetX + tooltip.caretX + offset
   let top = offsetY + tooltip.caretY + offset
-
-  if (tooltip.caretX + offset + twidth > width) left = left - (twidth + offset*2);
-  if (tooltip.caretY + offset + theight > height) top = top - (theight + offset*2);
+  if (left + twidth > $(chart.canvas).width()) left = left - (twidth + offset*2);
+  if (top + theight > $(chart.canvas).height()) top = top - (theight + offset*2);
 
   tooltipEl.css({
     opacity: 0,
@@ -552,6 +672,15 @@ const changepage = (page) => {
   $('.page').hide();
   $(`#${page}`).show();
   activepage = page;
+
+  $("#menu").children().removeClass("active");
+  $("#menu div[data-target='" + page + "']").addClass('active');
+
+  if(page === "duelgraph") {
+    $("#menu div[data-target='duel']").addClass('active');
+  }
+
+  scrollup.animate({top:'-30px'},300);
 }
 
 const footer = $('#footer')
@@ -611,19 +740,37 @@ const footerlist = {
 
 footer.on('click', function () { footerlist.__msgconfirm() });
 
-ipcRenderer.on('initdata', (event, context) => {
+const scrollup = $("#scrollup")
+scrollup.on('click', function() {
+  $("html, body").animate({scrollTop: 0}, 300);
+  scrollup.animate({top:'-30px'},300);
+});
+window.addEventListener("scrollend", (event) => {
+  if(window.scrollY > 300 && scrollup.offset().top - window.scrollY < 10){
+    scrollup.animate({top:'15px'},300)
+  }
+  else if(window.scrollY <= 300 && scrollup.offset().top - window.scrollY > 10){
+    scrollup.animate({top:'-30px'},300)
+  }
+});
+
+ipcRenderer.on('initdata', async (event, context) => {
   console.log("initdata");
   // console.log(context);
 
   if(context.ranking && context.updated){
-    drawranking.newdata(context)
+    ranking.newdata(context)
   }
-  
+});
+
+ipcRenderer.on('sendtoinfo', (event) => {
+  console.log("nothing cached");
+  changepage("info");
 });
 
 ipcRenderer.on('initranking', (event, context) => {
   console.log(context);
-  drawranking.newdata(context)
+  ranking.newdata(context)
 });
 
 ipcRenderer.on('spinnertext', (e, [state, text = ""]) => {
@@ -642,10 +789,6 @@ ipcRenderer.invoke('getAppversion').then((result) => {
   version = result;
   $('head title').text(`ThrustElo | v${result}`);
 });
-
-function isNumeric(n) {
-  return !isNaN(parseFloat(n)) && isFinite(n);
-}
 
 function debounce(func, wait = 500) {
   let timeout;
@@ -801,11 +944,11 @@ const chartduel = new Chart(document.getElementById("Canvas_duel").getContext("2
 });
 
 $('#menu div').each(function(index){
-  let top = 15 + 45 * index
+  let top = 15 + 51 * index
   $(this).css({top:top + 'px'});
 
   $(this).animate({
-    right: "-70px",
+    right: "-80px",
   },500);
 
   $(this).on("mouseover", function(){
@@ -818,7 +961,7 @@ $('#menu div').each(function(index){
   $(this).on("mouseout", function(){
     $(this).stop(true)
     $(this).animate({
-      right: "-70px",
+      right: "-80px",
     },500);
   });
 
@@ -833,5 +976,10 @@ const snooze = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 $(window).on('resize', debounce(() => {
   hidetooltip();
 }, 100));
+
+$(window).on('scroll', ()=>{
+  ranking.scroll()
+  duel.scroll()
+});
 
 init()

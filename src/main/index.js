@@ -72,7 +72,10 @@ const initdata = () => {
   console.log("initdata");
   const context = store.get("context");
   const favorites = store.get("favorites")
-  if(!context) return;
+  if(!context) {
+    mainWindow.webContents.send('sendtoinfo');
+    return
+  }
 
   context.favorites = favorites ? Object.keys(favorites) : [];
   
@@ -187,25 +190,39 @@ const getplayerdata = (playerid) => {
 
     let enemies = history.filter(item => ["Death to", "Kill"].includes(item.type))
     enemies = enemies.reduce((acc, item) => {
-      let target = acc.find(t => t[0] === item.player.name)
+      let target = acc.find(t => t.name === item.player.name)
       if(target){
-        target[1]++;
-        target[2] = target[2] + parseInt(item.player.elo)
+        target.events++;
+        target.eavarage = target.eavarage + parseInt(item.player.elo)
+
+        if(item.type === "Kill") target.k++;
+        else target.d++;
+
+        target.netelo = target.netelo + item.elo
+
       } else {
-        acc.push([item.player.name, 1, parseInt(item.player.elo)])
+        acc.push({
+          name: item.player.name,
+          events:1,
+          eavarage: parseInt(item.player.elo),
+          k: item.type === "Kill" ? 1 : 0,
+          d: item.type === "Death to" ? 1 : 0,
+          netelo: item.elo,
+        })
       }
       return acc;
     },[]);
 
     enemies.forEach(target => {
-      target[2] = Math.round(target[2] / target[1]);
+      target.eavarage = Math.round(target.eavarage / target.events);
+      target.kd = +((target.k/target.d).toFixed(4))
     })
-
+    
     enemies = enemies.sort((a, b) => {
-      if(a[1] === b[1]){
-        return a[0]>b[0] ? 1 : -1;
+      if(a.events === b.events){
+        return a.name>b.name ? 1 : -1;
       } else {
-        return a[1]<b[1] ? 1 : -1;
+        return a.events<b.events ? 1 : -1;
       }
     });
     

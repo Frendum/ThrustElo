@@ -18,11 +18,11 @@ html {
   display: flex;
   flex-wrap: nowrap;
   height: 100vh;
-  padding: 0 1.5rem 1.5rem 1.5rem;
+  padding: 0 2rem 0.5rem 2rem;
 }
 
 .chart {
-  padding-top: 75px;
+  margin-top: 75px;
 }
 
 .header {
@@ -30,7 +30,7 @@ html {
   width: 100%;
   left: 0;
   top: 0;
-  padding: 0.5rem 1.5rem 0 1.5rem;
+  padding: 0.5rem 2rem 0 2rem;
   position: absolute;
   overflow: hidden;
 }
@@ -42,7 +42,7 @@ html {
 
 .page .content{
   margin-top: 75px;
-
+  padding-bottom: 20px;
 }
 
 .table .thin{
@@ -90,33 +90,18 @@ html {
   cursor: text;
 }
 
-#searchn{
-  padding:0px;
-  font-size: 14px;
-  width: 75px;
-}
-
-#searchndropdown {
-  position: fixed;
-  max-height: 80%;
-  overflow: scroll;
-  overflow-x: hidden;
-}
-
-#searchndropdown li {
-  position: relative;
-  display: block;
-  padding: var(--bs-list-group-item-padding-y) var(--bs-list-group-item-padding-x);
-  color: var(--bs-list-group-color);
-  text-decoration: none;
-  background-color: var(--bs-list-group-bg);
-  border: var(--bs-list-group-border-width) solid var(--bs-list-group-border-color);
-}
-
 #tooltips {
   position: fixed;
   user-select: none;
   z-index: 50;
+}
+
+#tooltips #cls-tooltip {
+  position: absolute;
+  right: 2px;
+  top: 2px;
+  height: 22px;
+  padding: 0 3px 0 3px;
 }
 
 #footer {
@@ -131,22 +116,44 @@ html {
   height: 20px;
 }
 
+#scrollup {
+  position: fixed;
+  top: -30px;
+  left: 50%;
+  cursor: pointer;
+  content: url("data:image/svg+xml,%3csvg xmlns='http://www.w3.org/2000/svg' width='30' height='30' viewBox='0 0 16 16'%3e%3cpath fill='none' stroke='rgba%28255,255,255,1%29' stroke-linecap='round' stroke-linejoin='round' stroke-width='2' d='M5 14l6-6-6-6'/%3e%3c/svg%3e");
+  transform: rotate(270deg);
+  background-color: #006943;
+  border-radius: 5px;
+}
+
 #menu div {
   z-index: 99;
   position: fixed;
   right: 0px;
-  width: 90px;
-  height: 45px;
-  background-color: #006943;
+  width: 110px;
+  height: 50px;
+  background-color: #005969;
   color: white;
-  line-height: 43px;
-  text-align: center;
+  line-height: 50px;
+  text-align: left;
+  padding-left: 36px;
   text-decoration: none;
   font-size: 16px;
   border-radius: 15px 0 0 15px;
   cursor: pointer;
   user-select: none;
 }
+
+#menu div span {
+  position: absolute;
+  left: 7px;
+}
+
+#menu .active {
+  background-color: #008a57;
+}
+
 #menu .inactive {
   background-color: #424242;
   cursor: not-allowed;

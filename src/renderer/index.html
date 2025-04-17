@@ -10,9 +10,10 @@
 <body class="ec-dark">
   <div class="main">
     <div id="menu">
-      <div data-target="rankings">Rank</div>
-      <div data-target="history" class="inactive">History</div>
-      <div data-target="duel" class="inactive">Duel</div>
+      <div data-target="rankings" class="active">Rank<span>🎖️</span></div>
+      <div data-target="history" class="inactive">History<span>📈</span></div>
+      <div data-target="duel" class="inactive">Duel<span>⚔</span></div>
+      <div data-target="info" class="">Info<span>ℹ️</span></div>
     </div>
 
     <div id="tooltips"></div>
@@ -53,16 +54,73 @@
 
     <div class="page" id="duel" style="display: none;">
       <div class="header">
-        <input id="searchn" />
-        <ul class="list-group" id="searchndropdown" style="display: none;"></ul>
-        <span id="header_duel"></span><br><span id="segment_duel"></span>
+        <br><span id="header_duel"></span>
+      </div>
+      <div class="content">
+        <table class="table">
+          <thead id="dueltablehead">
+            <tr>
+              <th class="thin">📈</th>
+              <th class="thin sortable" data-sort="eavarage">~Elo<span></span></th>
+              <th id="tablesearchname"><span>Name</span></th>
+              <th class="thin sortable desc" data-sort="events">Events<span></span></th>
+              <th class="sortable" data-sort="k">Kill<span></span></th>
+              <th class="sortable" data-sort="d">Death to<span></span></th>
+              <th class="sortable" data-sort="kd">K/D<span></span></th>
+              <th class="sortable" data-sort="netelo">Net Elo Gain<span></span></th>
+
+            </tr>
+          </thead>
+          <tbody id="duel-table">
+          </tbody>
+        </table>
+      </div>
+    </div>
+
+    <div class="page" id="duelgraph" style="display: none;">
+      <div class="header">
+        <span id="header_duelgraph"></span><br><span id="segment_duelgraph"></span>
       </div>
       <canvas class="chart" id="Canvas_duel" role="img"></canvas>
+    </div>
+
+    <div class="page" id="info" style="display: none;">
+      <div class="header">
+        <h1>Welcome to ThrustElo</h1>
+      </div>
+      <div class="content">
+        <p>ThrustElo is an app that allows you to graph your Elo progress, and some other data analytic tools. Mostly for bragging purposes.</p>
+        <p>Here are some of it features to get you started. With no promises that the app will work as is. Any feature might change, break or be removed at any time.</p>
+        <h2>Pages</h2>
+        <p>On the top right corner you will find page buttons. Click on them to navigate between pages.</p>
+        <h3>Rank</h3>
+        <p>Lists all the pilots and their basic stats for this season. There is an update button that will update the list with the latest data, provided by the api. Users with less than ten kills will not be shown. The last update is timestamped and cached locally for the next time you open the app. All timestamps are shown in UTC (Zulu) time.</p>
+        <p>Column headers have different functions. Some will sort the rows, some will filter. Click on "Name" allows you to search for a specific pilot. Append a "?" to search through all their known aliases.</p>
+        <p>Each row has two functions. Add a ⭐ to your favourite pilot. Click on 📈 to see their history.</p>
+        <h3>History</h3>
+        <p>Shows a graph of the pilot kills and deaths for this season, with their respective Elo gains/losses. Hover each event to find more information on what happened.</p>
+        <p>
+          There are some zoom and pan features available:<br>
+          Click and drag to zoom in on a specific section.<br>
+          Mouse scroll to zoom in and out.<br>
+          CTRL + mouse drag to pan.
+        </p>
+        <p>Some of these features will transfer into VR mode, but not all.</p>
+        <p>When zoomed in enough, the graph will also show lines indicating day or user logged into a map (the latter is not always provided by the API, so it may not be available for all sessions).</p>
+        <h3>Duel</h3>
+        <p>When a pilot data has been loaded, you can click on the "Duel" button to get some stats about that pilot versus other pilots.</p>
+        <p>This function is only working with the first pilots' history data and the included nemesis pilots name. If two nemeses have the same exact name, the stats will be combined.</p>
+        <p>The table works pretty much the same as in the Rank page.</p>
+        <p>The graph is a bit different. It shows all the events between the two pilots.</p>
+
+      </div>
     </div>
 
   </div>
 
   <div id="footer" style="display: none;"></div>
+
+  <div id="scrollup"></div> 
 
   <div class="modal-backdrop" id="spinner" style="display: none;"><div class="spinnerbody"><div class="spinner"></div><br><div id="spinnertext">Loading...</div></div><div></div>
 
