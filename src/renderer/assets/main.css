@@ -45,6 +45,10 @@ html {
   padding-bottom: 20px;
 }
 
+.page a {
+  color: #9ccaff;
+}
+
 .table .thin{
   width:1%;
   text-align: center;
@@ -89,6 +93,51 @@ html {
 #tablesearchname span {
   cursor: text;
 }
+
+#info .content .card{
+  background-color: #00694367;
+  border-radius: 20px;
+  margin-bottom: 4px;
+}
+
+#info .content .row{
+  margin: 0px;
+}
+
+#info .content .row>[class*="col-"]{
+  padding-right: 2px;
+  padding-left: 2px;
+}
+
+
+#info .content .card table td:first-child {
+  text-align: end;
+  padding-right: 5px;
+}
+
+#info .content .card table td:not(:first-child) {
+  font-weight: bold;
+}
+
+#info .content .card .card-header{
+  background-color: #006943;
+  font-size: smaller;
+  border-radius: 20px 20px 0 0;
+  padding: 0 1rem 0 1rem;
+}
+
+#info .content .card .avatar{
+  width: 80px;
+  height: 80px;
+  border-radius: 50%;
+  float: inline-start;
+  margin-right:10px;
+}
+
+#info .content .card .card-body{
+  padding: 0.5rem 1rem 0.5rem 1rem;
+}
+
 
 #tooltips {
   position: fixed;

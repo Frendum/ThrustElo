@@ -33,8 +33,8 @@ const ranking = {
     }
 
     $("#rankingtablehead th").removeClass("asc desc")
-    $("#rankingtablehead th[data-sort='elo']").addClass("desc")
-    this.search(this.searchterm)
+    $("#rankingtablehead th[data-sort='rank']").addClass("asc")
+    this.sort(["rank", 1])
   },
   populate: function(){
     let i = this.__loaded;
@@ -54,6 +54,10 @@ const ranking = {
       const graph = document.createElement('td')
       graph.innerHTML = "📈";
       graph.style.cursor = "pointer";
+
+      const info = document.createElement('td')
+      info.innerHTML = "ℹ️";
+      info.style.cursor = "pointer";
 
       const rank = document.createElement('td')
       rank.innerHTML = player.rank;
@@ -100,8 +104,13 @@ const ranking = {
       $(graph).on('click', async function () {
         $("#rankings-table tr").removeClass("selected");
         $(tr).addClass("selected");
-        let playerdata = await ipcRenderer.invoke("getplayerdata", player.id)
-        if(playerdata) userhistory(playerdata);
+        invokeplayerdata(player.id,"history")
+      });
+
+      $(info).on('click', async function () {
+        $("#rankings-table tr").removeClass("selected");
+        $(tr).addClass("selected");
+        invokeplayerdata(player.id,"info")
       });
 
       const selectuser = () => {
@@ -116,6 +125,7 @@ const ranking = {
       }
   
       tr.append(fav);
+      tr.append(info);
       tr.append(graph);
       tr.append(rank);
       tr.append(elo);
@@ -145,7 +155,13 @@ const ranking = {
       this.__resultarray = this.__resultarray.filter(item => this.__favorites.includes(item.id));
     }
     
-    if(this.searchterm){
+    if(/^\d{17}$/.test(this.searchterm)){
+      console.log("steamid?", this.searchterm);
+      this.__resultarray = this.__resultarray.filter((item) => {
+        return item.id === this.searchterm;
+      });
+    }
+    else if(this.searchterm){
       console.log("searching for ",this.searchterm);
       if(this.searchterm.endsWith("?")){
         this.__resultarray = this.__resultarray.filter((item) => {
@@ -167,9 +183,6 @@ const ranking = {
     }
   },
   sort: function(sortby){
-    this.__table.empty();
-    this.__loaded = 0;
-    
     this.__ranking.sort(function (a, b){
       if(b[sortby[0]] == null){return -1;}
       if(a[sortby[0]] == null){return 1;}
@@ -180,8 +193,6 @@ const ranking = {
   },
 }
 
-
-
 $("#update-ranking").on("click", () => {
   console.log("update-ranking");
   ipcRenderer.send("updateranking");
@@ -190,12 +201,14 @@ $("#update-ranking").on("click", () => {
 $("#update-solo").on("click", async () => {
   console.log("update-solo");
   if(!player.id) return;
-  let playerdata = await ipcRenderer.invoke("getplayerdata", player.id)
-  if(playerdata) userhistory(playerdata, true);
+  invokeplayerdata(player.id)
 });
 
 $("#solo-zoom-out").on("click", () => {setzoomlastday(false)})
 $("#solo-zoom-in").on("click", () => {setzoomlastday(true)})
+
+$("#solo-information").on("click", () => {changepage("info")})
+$("#info-graph").on("click", () => {changepage("history")})
 
 $("#rankingtablehead #tablesearchname span").on("click", function(e) {
   ranking.search("")
@@ -228,7 +241,7 @@ $("#rankingtablehead #tablesearchname span").on("click", function(e) {
   });
 });
 
-$("#favfilter").on("click", function() { 
+$("#favfilter").on("click", function() {
   const active = $(this).hasClass('active')
   if(active) $(this).removeClass('active')
   else $(this).addClass('active')
@@ -252,13 +265,12 @@ $('#rankingtablehead .sortable').on("click", function() {
 });
 
 const userhistory = async (data, lastday) => {
-  changepage('history')
   player = data
   
   chart.resetZoom()
   hidetooltip()
-  draw(data.data)
-  $('head title').text(`ThrustElo | v${version} | ${data.pilotName}`)
+  draw(data.history)
+  $('head title').text(`ThrustElo | v${version} | ${data.isAlt ? '(Alt)' : ''} ${data.pilotName} (${Math.round(data.elo)})`)
 
   if(lastday && zoomlastday == true){
     setzoomlastday(true);
@@ -348,11 +360,12 @@ const draw = (data) => {
   drawlines.draw()
 
   $("#menu div[data-target='history']").removeClass('inactive');
+  $("#menu div[data-target='info']").removeClass('inactive');
   $("#menu div[data-target='duel']").removeClass('inactive');
 }
 
 const drawduel = (target, avarage) => {
-  let data = player.data.filter(item => {
+  let data = player.history.filter(item => {
     return ["Death to", "Kill"].includes(item.type)
     && item.player.name === target;
   })
@@ -408,24 +421,24 @@ const segment = {
     const data = chart.data.datasets[0].original.slice(min, max+1);
 
     const positive = data.filter(d => d.type == 'Kill');
-    const negative = data.filter(d => d.type ==  'Death to');
+    const negative = data.filter(d => d.type == 'Death to');
     const ratio = parseFloat(positive.length / negative.length).toFixed(3);
     const gain = (positive.reduce((a,b) => a+b.elo,0)/positive.length).toFixed(2);
     const loss = (negative.reduce((a,b) => a+b.elo,0)/negative.length).toFixed(2);
-    const peak = data.reduce((a,b) => Math.max(a,b.newElo),-Infinity);
+    const peak = data.reduce((a,b) => Math.max(a,b.newElo), -Infinity);
     const nadir = data.reduce((a,b) => Math.min(a, b.newElo), Infinity);
 
     $('#header_solo').html(`<small>Segment: K/D/R = ${positive.length}/${negative.length}/${ratio} | Avarage Elo Gain/Loss = ${gain}/${loss} | Elo Peak/Nadir = ${peak}/${nadir}</small>`);
   },
   updateduel: function(){
-    const [min,max] = [chartduel.scales.x.min, chartduel.scales.x.max];    
+    const [min,max] = [chartduel.scales.x.min, chartduel.scales.x.max];
     if(chartduel.data.datasets.length == 0) return;
     const data = chartduel.data.datasets[0].original.slice(min, max+1);
     
     const positive = data.filter(d => d.type == 'Kill');
-    const negative = data.filter(d => d.type ==  'Death to');
+    const negative = data.filter(d => d.type == 'Death to');
     const gain = (positive.reduce((a,b) => a+b.elo,0));
-    const loss =  Math.abs((negative.reduce((a,b) => a+b.elo,0)));
+    const loss = Math.abs((negative.reduce((a,b) => a+b.elo,0)));
 
     $('#segment_duelgraph').html(`<small>Segment: ${data.length} events | Kills ${positive.length} - ${negative.length} | Elo Stolen ${gain} - ${loss}</small>`);
   },
@@ -491,7 +504,7 @@ const duel = {
         $(tr).addClass("selected");
         chartduel.resetZoom()
         drawduel(player.name, player.eavarage)
-        changepage("duelgraph")
+        changepage("duelgraph", "duel")
       });
 
       tr.append(graph);
@@ -547,7 +560,234 @@ const duel = {
   },
 }
 
-$('#dueltablehead .sortable').on("click", function() {
+const info = {
+  populate: function () {
+    this.__contentrow.empty();
+    $('#info #info-name').text(`${player.isAlt ? '🤡' : ''} ${player.pilotName} (${Math.round(player.elo)})`);
+
+    //Pilot
+    let pilotnames = [...new Set(player.pilotNames)];
+    pilotnames = pilotnames.reduce((a,b) => a + b + ', ' ,'').slice(0,-2);
+    
+    const pilot_body = document.createElement('div')
+    pilot_body.innerHTML = `
+      <table>
+        <tr><td>Rank:</td><td>${player.rank || (player.isBanned ? 'Banned 😭' : (player.isAlt ? '🤡' : ''))}</td></tr>
+        <tr><td>Elo:</td><td>${Math.round(player.elo)}</td></tr>
+        <tr><td>Peak:</td><td>${Math.round(player.eloHistory.peak)}</td></tr>
+        <tr><td>Nadir:</td><td>${Math.round(player.eloHistory.nadir)}</td></tr>
+        <tr><td>SteamId:</td><td>${player.id}</td></tr>
+        <tr><td>Aliases:</td><td>${pilotnames}</td></tr>
+      </table>
+    `;
+
+    const pilot = this.__cardcreator({
+      header: "Pilot",
+      body: [pilot_body],
+    }, 'col-md-6')
+    this.__contentrow.append(pilot)
+
+    //ParentId
+    if (player.altParentId){
+      const main = ranking.__ranking.find((p) => p.id === player.altParentId);
+      const parent_name = document.createElement("div");
+      const parent_link = document.createElement("a");
+      if(main){
+        parent_link.innerText = `${main.pilotNames[0]} (${Math.round(main.elo)})`;
+        parent_link.href = "#";
+        parent_link.style.cursor = "pointer";
+        parent_link.addEventListener('click', async () => {
+          invokeplayerdata(main.id, "info")
+        });
+      } else {
+        parent_link.innerText = `Unknown player id: ${player.altParentId}`;
+      }
+      parent_name.appendChild(parent_link);
+
+      const parent = this.__cardcreator({
+        header: "Main Pilot",
+        body: [parent_name],
+      }, 'col-md-6')
+      this.__contentrow.append(parent)
+    }
+
+
+    //Discord
+    if (player.discord) {
+      const discord_name = document.createElement("div");
+      discord_name.innerHTML = 
+      `<div style="font-weight: bold;">${player.discord.global_name || player.discord.username}</div>
+      <div>@${player.discord.username}</div>`;
+  
+      const discord = this.__cardcreator({
+        header: "Discord",
+        body: [discord_name],
+        avatar: player.discord.avatar.link || 'https://cdn.discordapp.com/embed/avatars/1.png',
+      }, 'col-md-6')
+      this.__contentrow.append(discord)
+    }
+
+
+    //Achievements
+    if(player.achievements && player.achievements.length > 0){
+      const achievements_body = document.createElement('div')
+      let txt = ""
+      for(let element of player.achievements){
+        txt += `<span style="font-weight: bold;">${element.id}</span> * ${element.count} | First achieved ${moment(element.firstAchieved).format('YYYY-MM-DD')}<br>`;
+      }
+
+      achievements_body.innerHTML = txt;
+      const achievements = this.__cardcreator({
+        header: "Achievements",
+        body: [achievements_body],
+      }, 'col-md-6')
+      this.__contentrow.append(achievements)
+    }
+
+    //Alts
+    if(player.altIds && player.altIds.length > 0){
+      const alts_body = document.createElement('div')
+
+      for(let element of player.altIds){
+        const child = ranking.__ranking.find((p) => p.id === element);
+        const child_link = document.createElement("a");
+        if(child){
+          child_link.innerText = `${child.pilotNames[0]} (${Math.round(child.elo)})`;
+          child_link.style.cursor = "pointer";
+          child_link.href = "#";
+          child_link.addEventListener('click', async () => {
+            invokeplayerdata(child.id,"info")
+          });
+        } else {
+          child_link.innerText = `Unknown player id: ${element}`;
+        }
+        alts_body.appendChild(child_link);
+        alts_body.appendChild(document.createElement("br"));
+        
+      }
+
+      const alts = this.__cardcreator({
+        header: "Alts 🤡",
+        body: [alts_body],
+      }, 'col-md-6')
+      this.__contentrow.append(alts)
+    }
+
+
+    //Weapons
+    let weapons = [
+      ["Kill With", player.weapons.plane.kill_in],
+      ["Kill Against", player.weapons.plane.kill_to],
+      ["Death In", player.weapons.plane.death_in],
+      ["Death By", player.weapons.plane.death_by],
+      ["Weapon Kill", player.weapons.weapon.kill],
+      ["Weapon Death", player.weapons.weapon.death],
+    ]
+
+    for(let [header, weapon] of weapons){
+      const killwith = this.__cardcreator({
+        header: header,
+        body: [this.__weaponcreator(weapon)],
+      }, 'col-sm-3')
+      this.__contentrow.append(killwith)
+    }
+  },
+  timeline: () => {
+    if(activepage != "info") return;
+    const canvas = $("#timeline-canvas")
+    canvas[0].width = canvas.width()
+    const ctx = canvas[0].getContext('2d');
+    canvas[0].width = canvas.width()
+    const [width, height] = [canvas[0].width, canvas[0].height]
+
+    ctx.clearRect(0, 0, width, height)
+
+    if(!player || !player.eloHistory) return;
+
+    ctx.fillStyle = "black"
+    ctx.fillRect( 0,0, width, height );
+
+    ctx.fillStyle = "orange"
+
+    const sessions = player.sessions
+    const history = player.eloHistory;
+
+    const spany = sessions.end - sessions.start;
+    const spanx = history.peak - history.nadir
+
+    let coord = function(x, y) { return [
+      5 + (width-10)/spany * (x-sessions.start),
+      5 + (height-10) - (height-10)/spanx * (y- history.nadir),
+    ]}
+
+    history.data.forEach(element => {
+      ctx.fillRect( ...coord(element.time, element.elo), 1, 1 );
+
+    });
+    
+    coord = function(start, end) {
+      return [
+      5 + (width-10)/spany * (start-sessions.start),
+      0,
+      Math.max((width-10) / spany *(end-start), 1),
+      5,
+    ]}
+
+    ctx.fillStyle = "red"
+    sessions.data.forEach(element => {
+      ctx.fillRect(...coord(element.start, element.end + 1));
+
+    });
+
+    
+  },
+  __cardcreator: (content, c) => {
+    const col = document.createElement('div')
+    col.classList.add(c);
+    const card = document.createElement('div')
+    card.classList.add('card');
+  
+    if(content.header){
+      const header = document.createElement('div')
+      header.classList.add('card-header');
+      header.innerHTML = content.header;
+      card.appendChild(header)
+    }
+  
+    const body = document.createElement('div')
+    body.classList.add('card-body');
+  
+    if(content.avatar){
+      const avatar = document.createElement('img')
+      avatar.src = content.avatar;
+      avatar.alt = 'Avatar';
+      avatar.classList.add('avatar');
+      body.appendChild(avatar);
+    }
+  
+    for(let element of content.body){
+      body.append(element)
+    }
+    
+    card.appendChild(body)
+    col.appendChild(card)
+    return col;
+  },
+  __weaponcreator: (content) => {
+    const div = document.createElement('div')
+    const stats = Object.entries(content).sort((a,b) => a[1] > b[1] ? -1 : 1)
+    let txt = "<table>"
+    for(let [key, value] of stats){
+      txt += `<tr><td>${key}: </td><td>${value}</td></tr>`;
+    }
+    txt += "</table>";
+    div.innerHTML = txt;
+    return div;
+  },
+  __contentrow: $("#info .content .row"),
+}
+
+$('#dueltablehead .sortable').on("click", function () {
   $(this).siblings().removeClass("asc desc");
   const sort = $(this).attr("data-sort")
 
@@ -666,7 +906,7 @@ const solotooltip = debounce((context) => {
   }, 350);
 }, 350);
 
-const changepage = (page) => {
+const changepage = (page, marked) => {
   console.log("changepage", page);
   hidetooltip();
   $('.page').hide();
@@ -676,8 +916,13 @@ const changepage = (page) => {
   $("#menu").children().removeClass("active");
   $("#menu div[data-target='" + page + "']").addClass('active');
 
-  if(page === "duelgraph") {
-    $("#menu div[data-target='duel']").addClass('active');
+  if(marked) {
+    $("#menu div[data-target='" + marked + "']").addClass('active');
+  }
+
+  if(page === "info"){
+    info.populate()
+    info.timeline()
   }
 
   scrollup.animate({top:'-30px'},300);
@@ -763,9 +1008,19 @@ ipcRenderer.on('initdata', async (event, context) => {
   }
 });
 
-ipcRenderer.on('sendtoinfo', (event) => {
+const invokeplayerdata = async (steamid, page) => {
+  let playerdata = await ipcRenderer.invoke("getplayerdata", steamid)
+  if (playerdata){
+    userhistory(playerdata);
+    if(page){
+      changepage(page)
+    }
+  } 
+};
+
+ipcRenderer.on('sendtohome', (event) => {
   console.log("nothing cached");
-  changepage("info");
+  changepage("home");
 });
 
 ipcRenderer.on('initranking', (event, context) => {
@@ -783,7 +1038,7 @@ ipcRenderer.on('spinnertext', (e, [state, text = ""]) => {
 })
 
 ipcRenderer.on('showmsg', (event, data) => { footerlist.addMsg(...data) });
-ipcRenderer.on('clearmsg',  (event, id) => { footerlist.clearmsg(id) });
+ipcRenderer.on('clearmsg', (event, id) => { footerlist.clearmsg(id) });
 ipcRenderer.invoke('getAppversion').then((result) => {
   console.log('Version:', result);
   version = result;
@@ -975,6 +1230,7 @@ const snooze = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 $(window).on('resize', debounce(() => {
   hidetooltip();
+  info.timeline()
 }, 100));
 
 $(window).on('scroll', ()=>{

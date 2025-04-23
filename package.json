@@ -1,6 +1,6 @@
 {
     "name": "thrustelo",
-    "version": "1.0.2",
+    "version": "1.0.3",
     "description": "Fly High, Rank Tight.",
     "main": "./out/main/index.js",
     "author": "Frendum",

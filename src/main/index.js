@@ -73,7 +73,7 @@ const initdata = () => {
   const context = store.get("context");
   const favorites = store.get("favorites")
   if(!context) {
-    mainWindow.webContents.send('sendtoinfo');
+    mainWindow.webContents.send('sendtohome');
     return
   }
 
@@ -188,8 +188,49 @@ const getplayerdata = (playerid) => {
       }
     })
 
+    let eloHistory = data.eloHistory.sort((a, b) => a.time - b.time)
+    eloHistory = eloHistory.reduce((acc, item) => {
+      acc.nadir = Math.min(acc.nadir, item.elo);
+      acc.peak = Math.max(acc.peak, item.elo);
+      return acc
+    }, {
+      peak: -Infinity,
+      nadir: Infinity,
+      data: eloHistory,
+      start: eloHistory[0].time,
+      end: eloHistory[eloHistory.length - 1].time,
+    });
+
+    let sessions = data.sessions.sort((a, b) => a.startTime - b.startTime)
+      .filter((session) => { return session.startTime != 0 && session.endTime != 0 && session.startTime > eloHistory.start });
+
+    sessions = sessions.reduce((acc, item, index) => {
+      if(index == 0){
+        acc.data.push({
+          start: item.startTime,
+        })
+      }
+      else if(index == sessions.length - 1){
+        acc.data[acc.data.length - 1].end = item.endTime;
+      }
+      else if (item.startTime > sessions[index - 1].endTime + 1000 * 3600 * 3){
+        acc.data[acc.data.length - 1].end = sessions[index - 1].endTime;
+        acc.data.push({
+          start: item.startTime,
+        })
+      }
+      
+      return acc
+    },{
+      start: sessions[0].startTime,
+      end: sessions[sessions.length - 1].endTime,
+      data: [],
+    });
+
+
+
     let enemies = history.filter(item => ["Death to", "Kill"].includes(item.type))
-    enemies = enemies.reduce((acc, item) => {
+    .reduce((acc, item) => {
       let target = acc.find(t => t.name === item.player.name)
       if(target){
         target.events++;
@@ -226,13 +267,59 @@ const getplayerdata = (playerid) => {
       }
     });
     
+    let weapons = history.filter(item => ["Death to", "Kill"].includes(item.type))
+    .reduce((acc, item) => {
+      if(item.type === "Kill") {
+        acc.plane.kill_in[item.gun.from] = (acc.plane.kill_in[item.gun.from] || 0) + 1;
+        acc.plane.kill_to[item.gun.to] = (acc.plane.kill_to[item.gun.to] || 0) + 1;
+        acc.weapon.kill[item.gun.type] = (acc.weapon.kill[item.gun.type] || 0) + 1;
+      }
+      else {
+        acc.plane.death_in[item.gun.to] = (acc.plane.death_in[item.gun.to] ||0) + 1;
+        acc.plane.death_by[item.gun.from] = (acc.plane.death_by[item.gun.from] || 0) + 1;
+        acc.weapon.death[item.gun.type] = (acc.weapon.death[item.gun.type] || 0) + 1;
+      }
+      return acc
+    },{
+      plane: {
+        kill_in: {},
+        kill_to: {},
+        death_in: {},
+        death_by: {},
+      },
+      weapon: {
+        kill: {},
+        death: {}
+      }
+    });
+
     const context = {
-      data: history,
+      history: history,
       enemies: enemies,
-      // orig:data,
+      orig:data,
+      elo: data.elo,
       id: data.id,
       pilotName: data.pilotNames[0],
-      pilotNames: data.pilotNames
+      pilotNames: data.pilotNames,
+      discordId: data.discordId,
+      discord: null,
+      isAlt: data.isAlt,
+      altIds: data.altIds,
+      altParentId: data.altParentId,
+      weapons: weapons,
+      achievements: data.achievements,
+      eloHistory: eloHistory,
+      sessions: sessions,
+      rank: data.rank,
+      isBanned: data.isBanned,
+    }
+
+    if(data.discordId){
+      try{
+        context.discord = await discordapiget(data.discordId)
+      } catch (e){
+        console.log("Discord API Error", e);
+      }
     }
 
     spinnertext(false);
@@ -249,6 +336,42 @@ const hsapiget = async (resource) => {
     }
 
     const req = restapi.get(options, (res) => {
+      let chunks = [];
+      res.on('data', function(chunk) {
+        chunks.push(chunk);
+      }).on('end', function() {
+        let body = Buffer.concat(chunks);
+        try {
+          if(res.statusCode == 200 && res.headers['content-type'] == 'application/json; charset=utf-8'){
+            resolve(JSON.parse(body));
+          } else {
+            if(res.headers['content-type'] == 'text/plain; charset=UTF-8'){
+              throw new Error("Did not recieve a JSON response from the server: " + body.toString());
+            }
+            throw new Error("Did not recieve a JSON response from the server: unknown content-type");
+          }
+        } catch (error) {
+          reject(error);
+        }
+      })
+    });
+    
+    req.on('error', function(e) {
+      console.log('ERROR: ' + e.message);
+      reject(e);
+    });
+  });
+};
+
+const discordapiget = async (resource) => {
+  return new Promise((resolve, reject) => {
+    if(usetestapi) return resolve(null);
+    const options = {
+      host: "discordlookup.mesalytic.moe",
+      path: '/v1/user/' + resource,
+    }
+
+    const req = https.get(options, (res) => {
       let chunks = [];
       res.on('data', function(chunk) {
         chunks.push(chunk);
