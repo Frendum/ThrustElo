@@ -133,7 +133,7 @@ const ranking = {
       tr.append(k);
       tr.append(d);
       tr.append(kd);
-      tr.append(tk)
+      // tr.append(tk)
       this.__table.append(tr);
 
       i++;
@@ -276,6 +276,7 @@ const userhistory = async (data, lastday) => {
     setzoomlastday(true);
   }
 
+  info.populate()
   duel.newdata(data.enemies)
 };
 
@@ -398,13 +399,11 @@ const drawlines = {
     let [min,max] = [chart.scales.x.min, chart.scales.x.max];
     segment.update();
     if(max-min < 400 && !this.visible){
-      console.log("visible");
       chart.options.plugins.annotation.annotations = this.annotations;
       this.visible = true;
       chart.update();
     }
     else if(max-min > 400 && this.visible){
-      console.log("hidden");
       chart.options.plugins.annotation.annotations = [];
       this.visible = false;
       chart.update();
@@ -494,6 +493,15 @@ const duel = {
       const netelo = document.createElement('td')
       netelo.innerText = player.netelo
 
+      const teamevents = document.createElement('td')
+      teamevents.innerText = player.teamevents
+
+      const tk = document.createElement('td')
+      tk.innerText = player.tk
+
+      const td = document.createElement('td')
+      td.innerText = player.td
+
       $(tr).on('click', async function () {
         $("#duel-table tr").removeClass("selected");
         $(tr).addClass("selected");
@@ -515,6 +523,9 @@ const duel = {
       tr.append(d);
       tr.append(kd);
       tr.append(netelo);
+      tr.append(teamevents);
+      tr.append(tk);
+      tr.append(td);
       this.__table.append(tr);
 
       i++;
@@ -551,8 +562,8 @@ const duel = {
     this.__loaded = 0;
 
     this.__enemies.sort(function (a, b){
-      if(b[sortby[0]] == null){return -1;}
-      if(a[sortby[0]] == null){return 1;}
+      if([null, NaN].includes(b[sortby[0]])){return -1;}
+      if([null, NaN].includes(a[sortby[0]])){return 1;}
       return (a[sortby[0]]-b[sortby[0]]) * sortby[1];
     });
 
@@ -673,6 +684,28 @@ const info = {
       this.__contentrow.append(alts)
     }
 
+    //Kills/Deaths
+    const kills = player.history.filter((e) => e.type === "Kill").length
+    const deaths = player.history.filter((e) => e.type === "Death to").length
+    const teamkills = player.tks.length
+    const teamdeaths = player.tds.length
+    const kdbody = document.createElement('div')
+    kdbody.innerHTML = `
+      <table>
+        <tr><td>Kills:</td><td>${kills}</td></tr>
+        <tr><td>Deaths:</td><td>${deaths}</td></tr>
+        <tr><td>K/D:</td><td>${parseFloat(kills / deaths).toFixed(3)}</td></tr>
+        <tr><td>Team Kills:</td><td>${teamkills}</td></tr>
+        <tr><td>Team Deaths:</td><td>${teamdeaths}</td></tr>
+        <tr><td>TK/TD:</td><td>${parseFloat(teamkills / teamdeaths).toFixed(3)}</td></tr>
+      </table>
+    `;
+
+    const kd = this.__cardcreator({
+      header: "Kills / Deaths",
+      body: [kdbody],
+    }, 'col-md-6')
+    this.__contentrow.append(kd)
 
     //Weapons
     let weapons = [
@@ -691,55 +724,6 @@ const info = {
       }, 'col-sm-3')
       this.__contentrow.append(killwith)
     }
-  },
-  timeline: () => {
-    if(activepage != "info") return;
-    const canvas = $("#timeline-canvas")
-    canvas[0].width = canvas.width()
-    const ctx = canvas[0].getContext('2d');
-    canvas[0].width = canvas.width()
-    const [width, height] = [canvas[0].width, canvas[0].height]
-
-    ctx.clearRect(0, 0, width, height)
-
-    if(!player || !player.eloHistory) return;
-
-    ctx.fillStyle = "black"
-    ctx.fillRect( 0,0, width, height );
-
-    ctx.fillStyle = "orange"
-
-    const sessions = player.sessions
-    const history = player.eloHistory;
-
-    const spany = sessions.end - sessions.start;
-    const spanx = history.peak - history.nadir
-
-    let coord = function(x, y) { return [
-      5 + (width-10)/spany * (x-sessions.start),
-      5 + (height-10) - (height-10)/spanx * (y- history.nadir),
-    ]}
-
-    history.data.forEach(element => {
-      ctx.fillRect( ...coord(element.time, element.elo), 1, 1 );
-
-    });
-    
-    coord = function(start, end) {
-      return [
-      5 + (width-10)/spany * (start-sessions.start),
-      0,
-      Math.max((width-10) / spany *(end-start), 1),
-      5,
-    ]}
-
-    ctx.fillStyle = "red"
-    sessions.data.forEach(element => {
-      ctx.fillRect(...coord(element.start, element.end + 1));
-
-    });
-
-    
   },
   __cardcreator: (content, c) => {
     const col = document.createElement('div')
@@ -786,6 +770,98 @@ const info = {
   },
   __contentrow: $("#info .content .row"),
 }
+
+const timelinecanvas = {
+  canvas: $('#timeline-canvas'),
+  move: function(e){
+    this.__latest = e;
+    if(this.__timeout == null){
+      this.__timeout = setTimeout(() => {
+        this.__timeout = null;
+        this.aftermovement(this.__latest.offsetX, this.__latest.offsetY);
+      }, 100);
+    }
+  },
+  aftermovement: function(x,y){
+    const [time, elo] = this.__getdate(x,y);
+    $("#timeline-at").text(`${moment(time).toISOString(localtime)} ${elo}`);
+
+    
+  },
+  update: function(){
+    if(activepage != "info") return;
+    this.canvas[0].width = this.canvas.width()
+    this.canvas[0].height = this.canvas.height()
+    const ctx = this.canvas[0].getContext('2d');
+    const [width, height] = [this.canvas[0].width, this.canvas[0].height]
+
+    ctx.clearRect(0, 0, width, height)
+
+    if(!player || !player.eloHistory || !player.sessions) {
+      $("#timeline-start").text("");
+      $("#timeline-end").text("");
+      return;
+    }
+
+    ctx.fillStyle = "black"
+    ctx.fillRect(0, 0, width, height);
+
+    const sessions = player.sessions
+    const history = player.eloHistory;
+
+    const spanx = sessions.end - sessions.start;
+    const spany = history.peak - history.nadir
+
+    let coord = function(x, y) { return [
+      5 + (width-10)/spanx * (x-sessions.start),
+      5 + (height-10) - (height-10)/spany * (y- history.nadir),
+    ]}
+
+    $("#timeline-start").text(moment(sessions.start).toISOString(localtime));
+    $("#timeline-end").text(moment(sessions.end).toISOString(localtime));
+
+
+    history.data.forEach((element , index, array)=> {
+      if(index > 0){
+        ctx.fillStyle = element.elo > array[index-1].elo ? "green" : "red";
+        ctx.fillRect( ...coord(element.time, element.elo), 1, 1 );
+      } else {
+        ctx.fillStyle = element.elo > 2000 ? "green" : "red";
+        ctx.fillRect(  ...coord(element.time, element.elo), 1, 1 );
+      }
+
+    });
+    
+    coord = function(start, end) {
+      return [
+      5 + (width-10)/spanx * (start-sessions.start),
+      0,
+      Math.max((width-10) / spanx *(end-start), 1),
+      5,
+    ]}
+
+    ctx.fillStyle = "blue"
+    sessions.data.forEach(element => {
+      ctx.fillRect(...coord(element.start, element.end + 1));
+
+    });
+  },
+  __getdate: function(x,y){
+    const [width, height] = [this.canvas[0].width, this.canvas[0].height]
+    const sessions = player.sessions
+    const history = player.eloHistory;
+    const spanx = sessions.end - sessions.start;
+    const spany = history.peak - history.nadir
+    return [
+      Math.floor((x-5)/(width-10)*spanx + sessions.start),
+      Math.floor((y*spany - height*spany + 5*spany) / (-height + 10) + history.nadir),
+    ];
+  },
+  __latest: null,
+  __timeout: null,
+};
+
+timelinecanvas.canvas.on("mousemove", (e) => timelinecanvas.move(e));
 
 $('#dueltablehead .sortable').on("click", function () {
   $(this).siblings().removeClass("asc desc");
@@ -921,8 +997,8 @@ const changepage = (page, marked) => {
   }
 
   if(page === "info"){
-    info.populate()
-    info.timeline()
+    timelinecanvas.update();
+    window.scrollTo(0,0)
   }
 
   scrollup.animate({top:'-30px'},300);
@@ -991,6 +1067,7 @@ scrollup.on('click', function() {
   scrollup.animate({top:'-30px'},300);
 });
 window.addEventListener("scrollend", (event) => {
+  if(activepage === "info") return;
   if(window.scrollY > 300 && scrollup.offset().top - window.scrollY < 10){
     scrollup.animate({top:'15px'},300)
   }
@@ -1230,7 +1307,7 @@ const snooze = (ms) => new Promise((resolve) => setTimeout(resolve, ms))
 
 $(window).on('resize', debounce(() => {
   hidetooltip();
-  info.timeline()
+  timelinecanvas.update();
 }, 100));
 
 $(window).on('scroll', ()=>{

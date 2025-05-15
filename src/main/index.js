@@ -204,50 +204,62 @@ const getplayerdata = (playerid) => {
     let sessions = data.sessions.sort((a, b) => a.startTime - b.startTime)
       .filter((session) => { return session.startTime != 0 && session.endTime != 0 && session.startTime > eloHistory.start });
 
-    sessions = sessions.reduce((acc, item, index) => {
-      if(index == 0){
-        acc.data.push({
-          start: item.startTime,
-        })
-      }
-      else if(index == sessions.length - 1){
-        acc.data[acc.data.length - 1].end = item.endTime;
-      }
-      else if (item.startTime > sessions[index - 1].endTime + 1000 * 3600 * 3){
-        acc.data[acc.data.length - 1].end = sessions[index - 1].endTime;
-        acc.data.push({
-          start: item.startTime,
-        })
-      }
-      
-      return acc
-    },{
-      start: sessions[0].startTime,
-      end: sessions[sessions.length - 1].endTime,
-      data: [],
-    });
+    if(sessions.length){
+      sessions = sessions.reduce((acc, item, index) => {
+        if(index == 0){
+          acc.data.push({
+            start: item.startTime,
+          })
+        }
+        else if (item.startTime > sessions[index - 1].endTime + 1000 * 3600 * 3){
+          acc.data[acc.data.length - 1].end = sessions[index - 1].endTime;
+          acc.data.push({
+            start: item.startTime,
+          })
+        }
+  
+        if(index == sessions.length - 1){
+          acc.data[acc.data.length - 1].end = item.endTime;
+        }
+        return acc
+      },{
+        start: sessions[0].startTime,
+        end: sessions[sessions.length - 1].endTime,
+        data: [],
+      });
+    }
+    else {
+      sessions = null;
+    }
 
-
-
-    let enemies = history.filter(item => ["Death to", "Kill"].includes(item.type))
+    let enemies = history.filter(item => ["Death to", "Kill", "Teamkill", "Death to teamkill"].includes(item.type))
     .reduce((acc, item) => {
       let target = acc.find(t => t.name === item.player.name)
       if(target){
-        target.events++;
-        target.eavarage = target.eavarage + parseInt(item.player.elo)
+        if(["Death to", "Kill"].includes(item.type)){
+          target.events++;
+          target.eavarage = target.eavarage + item.player.elo;
+          if(item.type === "Kill") target.k++;
+          else target.d++;
 
-        if(item.type === "Kill") target.k++;
-        else target.d++;
-
-        target.netelo = target.netelo + item.elo
+          target.netelo = target.netelo + item.elo;
+        }
+        else {
+          target.teamevents++;
+          if(item.type === "Teamkill") target.tk++;
+          else target.td++;
+        }
 
       } else {
         acc.push({
           name: item.player.name,
-          events:1,
-          eavarage: parseInt(item.player.elo),
+          events: ["Death to", "Kill"].includes(item.type) ? 1 : 0,
+          teamevents: ["Teamkill", "Death to teamkill"].includes(item.type) ? 1 : 0,
+          eavarage: item.player.elo || 0,
           k: item.type === "Kill" ? 1 : 0,
           d: item.type === "Death to" ? 1 : 0,
+          tk: item.type === "Teamkill" ? 1 : 0,
+          td: item.type === "Death to teamkill" ? 1 : 0,
           netelo: item.elo,
         })
       }
@@ -293,10 +305,39 @@ const getplayerdata = (playerid) => {
       }
     });
 
+    const tks = history.filter(item => item.type === 'Teamkill')
+    const tds = history.filter(item => item.type === 'Death to teamkill')
+
+    let tksinfo = tks.reduce((acc, item) => {
+      let target = acc.find(t => t.name === item.player.name)
+      if(target){
+        target.events++;
+      } else {
+        acc.push({
+          name: item.player.name,
+          events:1,
+        })
+      }
+      return acc;
+    },[]).sort((a, b) => b.events - a.events);
+
+    let tdsinfo = tds.reduce((acc, item) => {
+      let target = acc.find(t => t.name === item.player.name)
+      if(target){
+        target.events++;
+      } else {
+        acc.push({
+          name: item.player.name,
+          events:1,
+        })
+      }
+      return acc;
+    },[]).sort((a, b) => b.events - a.events);
+    
     const context = {
       history: history,
       enemies: enemies,
-      orig:data,
+      // orig:data,
       elo: data.elo,
       id: data.id,
       pilotName: data.pilotNames[0],
@@ -312,11 +353,19 @@ const getplayerdata = (playerid) => {
       sessions: sessions,
       rank: data.rank,
       isBanned: data.isBanned,
+      tks: tks,
+      tds: tds,
+      tksinfo: tksinfo,
+      tdsinfo: tdsinfo,
     }
 
     if(data.discordId){
       try{
-        context.discord = await discordapiget(data.discordId)
+        context.discord = discordcache.find((d) => d.id === data.discordId);
+        if(!context.discord){
+          context.discord = await discordapiget(data.discordId)
+          discordcache.push(context.discord)
+        }
       } catch (e){
         console.log("Discord API Error", e);
       }
@@ -363,9 +412,10 @@ const hsapiget = async (resource) => {
   });
 };
 
+const discordcache = [];
 const discordapiget = async (resource) => {
   return new Promise((resolve, reject) => {
-    if(usetestapi) return resolve(null);
+    if(usetestapi) return reject("Discord API disabled");
     const options = {
       host: "discordlookup.mesalytic.moe",
       path: '/v1/user/' + resource,
@@ -413,11 +463,10 @@ const hsparseuserhistory = async (player) => {
     if(['Login', 'Logout'].includes(test[2])){
       data.push({time: time, type: test[2]});
     } else {
-      let type = ["Death to teamkill", "Teamkill", "Death (unknown)", "Kill", "Death to"].find(substr => test[2].startsWith(substr));
+      let type = ["Death to teamkill", "Teamkill", "Kill", "Death to"].find(substr => test[2].startsWith(substr));
 
       if(!type) {
         console.log("Error, could not find type:", line);
-        return
       }
 
       let params = test[2].replace(type + ' ', '');
@@ -427,56 +476,61 @@ const hsparseuserhistory = async (player) => {
       let newElo = undefined;
       
       if(['Kill', 'Death to'].includes(type)) {
-        let test = params.split(/(.*?) \((\d+)\) with (\w+)\-\>(\w+)\-\>(\w+) \((\d+\.\d+|\w+)\) (.+)/)
+        let test1 = params.split(/(.*?) \((\d+)\) with (\w+)\-\>(\w+)\-\>(\w+) \((\d+\.\d+|\w+)\) (.+)/)
+        
         if(!time){
           console.log("Error, could not parse line:", line);
         }
-        test.shift();
-        test.pop();
-        player.name = test.shift()
-        player.elo = test.shift()
-        gun.from = test.shift()
-        gun.type = test.shift()
-        gun.to = test.shift()
-        gun.multiplier = test.shift();
+        test1.shift();
+        test1.pop();
+        player.name = test1.shift()
+        player.elo = parseInt(test1.shift())
+        gun.from = test1.shift()
+        gun.type = test1.shift()
+        gun.to = test1.shift()
+        gun.multiplier = test1.shift();
 
         if(gun.multiplier == "undefined"){
           gun.multiplier = "?"
         }
 
-        test[0] = test[0].trimStart()
+        test1[0] = test1[0].trimStart()
 
-        let distance = test[0].split(/^Distance: (\d+\.\d)nm (.+)/)
+        let distance = test1[0].split(/^Distance: (\d+\.\d)nm (.+)/)
         if(distance[1]){
           gun.distance = distance[1];
-          test[0] = distance[2]
+          test1[0] = distance[2]
         }
 
-        elo = test[0].split(/^Elo (lost|gained): (\d+)\. New Elo: (\d+)/)
+        elo = test1[0].split(/^Elo (lost|gained): (\d+)\. New Elo: (\d+)/)
 
         if(!elo[1]){
           console.log("Error, could not parse line:", line);
           return
         }
-        newElo = elo[3];
+        newElo = parseInt(elo[3]);
         elo = elo[1] == "gained" ? Number(elo[2]) : -Number(elo[2]);
       }
-      else if(["Teamkill", "Death (unknown)"].includes(type)){
-        player.name = params.split(' Elo lost:')[0] //TODO
+      else if(type === "Teamkill"){
+        let test2 = params.split(/(.*?) Elo lost: \d+. New Elo: (\d+)/)
+        player.name = test2[1]
+        newElo = parseInt(test2[2])
+        elo = 0
       }
-      else if(["Death to teamkill"].includes(type)) {
-        // console.log("teamkilled"); TODO
+      else if(type === "Death to teamkill") {
+        let test3 = params.split(/from (.*?) no elo lost/)
+        player.name = test3[1]
+        elo = 0
       }
 
       data.push({
-          time: time,
-          type: type,
-          player: player,
-          gun: gun,
-          elo: elo,
-          newElo: newElo,
-        }
-      );
+        time: time,
+        type: type,
+        player: player,
+        gun: gun,
+        elo: elo,
+        newElo: newElo,
+      });
     }
   });
 

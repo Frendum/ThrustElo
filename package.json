@@ -1,8 +1,9 @@
 {
     "name": "thrustelo",
-    "version": "1.0.3",
+    "version": "1.0.4",
     "description": "Fly High, Rank Tight.",
     "main": "./out/main/index.js",
+    "homepage": "https://github.com/Frendum/ThrustElo",
     "author": "Frendum",
     "scripts": {
         "start": "electron-vite preview",
