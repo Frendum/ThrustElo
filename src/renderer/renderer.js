@@ -201,7 +201,7 @@ $("#update-ranking").on("click", () => {
 $("#update-solo").on("click", async () => {
   console.log("update-solo");
   if(!player.id) return;
-  invokeplayerdata(player.id)
+  invokeplayerdata(player.id, null, true)
 });
 
 $("#solo-zoom-out").on("click", () => {setzoomlastday(false)})
@@ -332,9 +332,9 @@ const draw = (data) => {
         event: at.type,
         type: 'line',
         scaleID: 'x',
-        value: at.index -0.5,
+        value: at.index + (at.type === "day" ? -0.5 : -0.4),
         borderColor: at.color,
-        borderWidth: 1.0,
+        borderWidth: 2,
       }
     };
   });
@@ -358,7 +358,7 @@ const draw = (data) => {
   chart.data = data;
   drawlines.annotations = annotations
   chart.update();
-  drawlines.draw()
+  drawlines.draw(true)
 
   $("#menu div[data-target='history']").removeClass('inactive');
   $("#menu div[data-target='info']").removeClass('inactive');
@@ -395,15 +395,15 @@ const drawduel = (target, avarage) => {
 }
 
 const drawlines = {
-  draw: function(){
+  draw: function(force){
     let [min,max] = [chart.scales.x.min, chart.scales.x.max];
     segment.update();
-    if(max-min < 400 && !this.visible){
+    if(max-min < 400 && (!this.visible || force)){
       chart.options.plugins.annotation.annotations = this.annotations;
       this.visible = true;
       chart.update();
     }
-    else if(max-min > 400 && this.visible){
+    else if(max-min > 400 && (this.visible || force)){
       chart.options.plugins.annotation.annotations = [];
       this.visible = false;
       chart.update();
@@ -1085,10 +1085,10 @@ ipcRenderer.on('initdata', async (event, context) => {
   }
 });
 
-const invokeplayerdata = async (steamid, page) => {
+const invokeplayerdata = async (steamid, page, lastday) => {
   let playerdata = await ipcRenderer.invoke("getplayerdata", steamid)
   if (playerdata){
-    userhistory(playerdata);
+    userhistory(playerdata, lastday);
     if(page){
       changepage(page)
     }

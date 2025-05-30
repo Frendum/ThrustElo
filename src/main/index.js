@@ -177,17 +177,6 @@ const getplayerdata = (playerid) => {
       userMsg.clear("nodata");
     }
 
-    history.forEach((item, index, arr) => {
-      if(item.type == "Login"){
-        if(!arr[index + 1]){
-          return;
-          }
-          else {
-            arr[index + 1].afterlogin = true;
-          }
-      }
-    })
-
     let eloHistory = data.eloHistory.sort((a, b) => a.time - b.time)
     eloHistory = eloHistory.reduce((acc, item) => {
       acc.nadir = Math.min(acc.nadir, item.elo);
@@ -451,6 +440,7 @@ const discordapiget = async (resource) => {
 
 const hsparseuserhistory = async (player) => {
   let data = [];
+  let afterlogin = true
 
   player.history.forEach((line) => {
     let test = line.split(/^\[(.*?)\] (.*)/)
@@ -461,12 +451,18 @@ const hsparseuserhistory = async (player) => {
     let time = moment(test[1]).valueOf();
 
     if(['Login', 'Logout'].includes(test[2])){
+      afterlogin = true; 
       data.push({time: time, type: test[2]});
     } else {
-      let type = ["Death to teamkill", "Teamkill", "Kill", "Death to"].find(substr => test[2].startsWith(substr));
+      let type = ["Death to teamkill", "Teamkill", "Kill", "Death to", "Replay link"].find(substr => test[2].startsWith(substr));
 
       if(!type) {
         console.log("Error, could not find type:", line);
+        return;
+      }
+      else if(type === "Replay link") {
+        // console.log(line); //TODO
+        return
       }
 
       let params = test[2].replace(type + ' ', '');
@@ -530,7 +526,12 @@ const hsparseuserhistory = async (player) => {
         gun: gun,
         elo: elo,
         newElo: newElo,
+        afterlogin: (afterlogin && ['Kill', 'Death to'].includes(type))
       });
+
+      if(["Kill", "Death to"].includes(type)) {
+        afterlogin = false
+      };
     }
   });
 
