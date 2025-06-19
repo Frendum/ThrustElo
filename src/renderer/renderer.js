@@ -296,8 +296,7 @@ const setzoomlastday = (state) => {
 
 const draw = (data) => {
   $('#header_solo').html(``);
-  data = data.filter(item => item.newElo > 0);
-
+  data = data.filter(item => item.newElo > 0 && ["Kill", "Death to"].includes(item.type));
   if(data.length == 0){
     footerlist.addMsg("Something went wrong, user has no history", 3000, "bg-danger")
     chart.data = {
@@ -313,7 +312,6 @@ const draw = (data) => {
     if(curr.afterlogin){
       arr[1].push({index: index, type:"login", color:"rgba(0,191,255,0.2)"});
     }
-
 
     if(!(
       (!localtime && moment(curr.time).utc().isSame(moment(arr[0]).utc(), 'day')) ||
@@ -347,7 +345,14 @@ const draw = (data) => {
     data: data.map(item => item.newElo),
     original: data.map(item => item),
     fill: false,
-    borderColor: 'rgb(255, 99, 132)',
+    segment: {
+      borderColor: (ctx) => {
+        return ctx.p0.raw < ctx.p1.raw ? "green" : "red"
+      }
+    },
+    backgroundColor: data.map((item) => {
+      return item.elo >= 0 ? "green" : "red";
+    }),
   };
 
   data = {
@@ -724,6 +729,23 @@ const info = {
       }, 'col-sm-3')
       this.__contentrow.append(killwith)
     }
+
+    //Playtime
+    const plbody = document.createElement('div')
+    plbody.innerHTML = `
+      <table>
+        <tr><td>Hours:</td><td>${parseFloat(player.sessions.hours).toFixed(3)}</td></tr>
+        <tr><td>KpH:</td><td>${parseFloat(kills/player.sessions.hours).toFixed(3)}</td></tr>
+        <tr><td>DpH:</td><td>${parseFloat(deaths/player.sessions.hours).toFixed(3)}</td></tr>
+        <tr><td>Sessions:</td><td>${player.sessions.data.length}</td></tr>
+      </table>
+    `;
+
+    const pl = this.__cardcreator({
+      header: "Playtime",
+      body: [plbody],
+    }, 'col-md-3')
+    this.__contentrow.append(pl)
   },
   __cardcreator: (content, c) => {
     const col = document.createElement('div')

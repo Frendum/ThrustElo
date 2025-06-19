@@ -194,13 +194,17 @@ const getplayerdata = (playerid) => {
       .filter((session) => { return session.startTime != 0 && session.endTime != 0 && session.startTime > eloHistory.start });
 
     if(sessions.length){
+      const hours = sessions.reduce((acc, item) => {
+        return acc + (item.endTime - item.startTime)
+      }, 0) /(1000 * 3600);
+
       sessions = sessions.reduce((acc, item, index) => {
         if(index == 0){
           acc.data.push({
             start: item.startTime,
           })
         }
-        else if (item.startTime > sessions[index - 1].endTime + 1000 * 3600 * 3){
+        else if (item.startTime > sessions[index - 1].endTime + 1000 * 3600 * 2){
           acc.data[acc.data.length - 1].end = sessions[index - 1].endTime;
           acc.data.push({
             start: item.startTime,
@@ -216,6 +220,8 @@ const getplayerdata = (playerid) => {
         end: sessions[sessions.length - 1].endTime,
         data: [],
       });
+
+      sessions.hours = hours
     }
     else {
       sessions = null;
