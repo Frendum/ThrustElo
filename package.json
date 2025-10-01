@@ -1,6 +1,6 @@
 {
     "name": "thrustelo",
-    "version": "1.0.6",
+    "version": "1.0.7",
     "description": "Fly High, Rank Tight.",
     "main": "./out/main/index.js",
     "homepage": "https://github.com/Frendum/ThrustElo",
@@ -29,10 +29,10 @@
         "moment": "^2.30.1"
     },
     "devDependencies": {
-        "electron": "^34.2.0",
-        "electron-builder": "^25.1.8",
-        "electron-vite": "^3.0.0",
-        "vite": "^6.1.0",
-        "electron-store": "^10.0.1"
+        "electron": "^38.2.0",
+        "electron-builder": "^26.0.12",
+        "electron-vite": "^4.0.1",
+        "vite": "^7.1.7",
+        "electron-store": "^11.0.0"
     }
 }

@@ -338,7 +338,7 @@ const getplayerdata = (playerid) => {
       pilotName: data.pilotNames[0],
       pilotNames: data.pilotNames,
       discordId: data.discordId,
-      discord: null,
+      discord: undefined,
       isAlt: data.isAlt,
       altIds: data.altIds,
       altParentId: data.altParentId,
@@ -352,18 +352,6 @@ const getplayerdata = (playerid) => {
       tds: tds,
       tksinfo: tksinfo,
       tdsinfo: tdsinfo,
-    }
-
-    if(data.discordId){
-      try{
-        context.discord = discordcache.find((d) => d.id === data.discordId);
-        if(!context.discord){
-          context.discord = await discordapiget(data.discordId)
-          discordcache.push(context.discord)
-        }
-      } catch (e){
-        console.log("Discord API Error", e);
-      }
     }
 
     spinnertext(false);
@@ -408,12 +396,28 @@ const hsapiget = async (resource) => {
 };
 
 const discordcache = [];
+ipcMain.handle('getdiscordinfo', async (event, discordId) => {
+  if(discordId){
+    try{
+      let data = discordcache.find((d) => d.id === discordId);
+      if(!data){
+        data = await discordapiget(discordId)
+        discordcache.push(data)
+      }
+      return data
+    } catch (e){
+      console.log("Discord API Error", e);
+      return null
+    }
+  }
+});
+
 const discordapiget = async (resource) => {
   return new Promise((resolve, reject) => {
     if(usetestapi) return reject("Discord API disabled");
     const options = {
-      host: "discordlookup.mesalytic.moe",
-      path: '/v1/user/' + resource,
+      host: "avatar-cyan.vercel.app",
+      path: '/api/' + resource,
     }
 
     const req = https.get(options, (res) => {

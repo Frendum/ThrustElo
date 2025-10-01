@@ -629,17 +629,14 @@ const info = {
 
 
     //Discord
-    if (player.discord) {
+    if (player.discordId) {
       const discord_name = document.createElement("div");
-      discord_name.innerHTML = 
-      `<div style="font-weight: bold;">${player.discord.global_name || player.discord.username}</div>
-      <div>@${player.discord.username}</div>`;
+      discord_name.innerHTML = `<br><div class="spinner"></div><br>`;
   
       const discord = this.__cardcreator({
         header: "Discord",
         body: [discord_name],
-        avatar: player.discord.avatar.link || 'https://cdn.discordapp.com/embed/avatars/1.png',
-      }, 'col-md-6')
+      }, 'col-md-6', 'discordcard')
       this.__contentrow.append(discord)
     }
 
@@ -747,9 +744,37 @@ const info = {
     }, 'col-md-3')
     this.__contentrow.append(pl)
   },
-  __cardcreator: (content, c) => {
+  populateDiscord: async function () {
+    const content = await ipcRenderer.invoke("getdiscordinfo", player.discordId);
+    player.discord = content;
+
+    if (content) {
+      const discord_name = document.createElement("div");
+      discord_name.innerHTML = 
+      `<div style="font-weight: bold;">${content.display_name || content.username}</div>
+      <div>@${content.username}</div>`;
+      const discord = this.__cardcreator({
+        header: "Discord",
+        body: [discord_name],
+        avatar: content.avatarUrl || 'https://cdn.discordapp.com/embed/avatars/1.png',
+      }, 'col-md-6', 'discordcard')
+      $('#info #discordcard')[0].replaceWith(discord);
+    }
+    else{
+      const discord_name = document.createElement("div");
+      discord_name.innerHTML = `<div>Failed to retrieve Discord information.</div>`;
+      const discord = this.__cardcreator({
+        header: "Discord",
+        body: [discord_name],
+      }, 'col-md-6', 'discordcard')
+      $('#info #discordcard')[0].replaceWith(discord);
+    }
+  },
+  __cardcreator: (content, c, id) => {
     const col = document.createElement('div')
     col.classList.add(c);
+    if(id) col.id = id;
+
     const card = document.createElement('div')
     card.classList.add('card');
   
@@ -1021,6 +1046,12 @@ const changepage = (page, marked) => {
   if(page === "info"){
     timelinecanvas.update();
     window.scrollTo(0,0)
+
+    if(player.discordId && player.discord === undefined){
+      player.discord = null;
+      console.log("update discord");
+      info.populateDiscord()
+    }
   }
 
   scrollup.animate({top:'-30px'},300);
