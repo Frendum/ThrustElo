@@ -349,7 +349,7 @@ const getplayerdata = (playerid) => {
       achievements: data.achievements,
       eloHistory: eloHistory,
       sessions: sessions,
-      rank: data.rank,
+      rank: data.isBanned ? null : data.rank,
       isBanned: data.isBanned,
       tks: tks,
       tds: tds,
