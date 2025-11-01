@@ -1,6 +1,6 @@
 {
     "name": "thrustelo",
-    "version": "1.0.7",
+    "version": "1.0.8",
     "description": "Fly High, Rank Tight.",
     "main": "./out/main/index.js",
     "homepage": "https://github.com/Frendum/ThrustElo",

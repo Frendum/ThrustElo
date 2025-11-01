@@ -60,7 +60,7 @@ const ranking = {
       info.style.cursor = "pointer";
 
       const rank = document.createElement('td')
-      rank.innerHTML = player.rank;
+      rank.innerHTML = player.isBanned ? '😭' : player.rank;
       rank.style.textAlign = "center";
   
       const elo = document.createElement('td')

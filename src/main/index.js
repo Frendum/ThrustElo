@@ -127,7 +127,10 @@ const getranking =  async () => {
   userMsg.clear("readerror")
 
   data = data.filter((player) => player.kills>=10 && player.pilotNames.length > 0);
-  data = data.sort((a, b) => b.elo - a.elo)
+
+  data.forEach((player) => {
+    if(player.isBanned) player.rank = null;
+  });
 
   const favorites = store.get("favorites")
 
