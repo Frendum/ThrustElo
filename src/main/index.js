@@ -72,6 +72,11 @@ const initdata = () => {
   console.log("initdata");
   const context = store.get("context");
   const favorites = store.get("favorites")
+  
+  if(Object.prototype.toString.call(favorites) === '[object Array]' || favorites === undefined) {
+    store.set("favorites", {})
+  }
+
   if(!context) {
     mainWindow.webContents.send('sendtohome');
     return
@@ -126,7 +131,7 @@ const getranking =  async () => {
   }
   userMsg.clear("readerror")
 
-  data = data.filter((player) => player.kills>=10 && player.pilotNames.length > 0);
+  data = data.filter((player) => player.kills>=11 && player.pilotNames.length > 0);
 
   data.forEach((player) => {
     if(player.isBanned) player.rank = null;
@@ -180,18 +185,24 @@ const getplayerdata = (playerid) => {
       userMsg.clear("nodata");
     }
 
-    let eloHistory = data.eloHistory.sort((a, b) => a.time - b.time)
-    eloHistory = eloHistory.reduce((acc, item) => {
-      acc.nadir = Math.min(acc.nadir, item.elo);
-      acc.peak = Math.max(acc.peak, item.elo);
-      return acc
-    }, {
-      peak: -Infinity,
-      nadir: Infinity,
-      data: eloHistory,
-      start: eloHistory[0].time,
-      end: eloHistory[eloHistory.length - 1].time,
-    });
+    let eloHistory = {
+      start: null
+    }
+    
+    if(data.eloHistory.length){
+      eloHistory = data.eloHistory.sort((a, b) => a.time - b.time)
+      eloHistory = eloHistory.reduce((acc, item) => {
+        acc.nadir = Math.min(acc.nadir, item.elo);
+        acc.peak = Math.max(acc.peak, item.elo);
+        return acc
+      }, {
+        peak: -Infinity,
+        nadir: Infinity,
+        data: eloHistory,
+        start: eloHistory[0].time,
+        end: eloHistory[eloHistory.length - 1].time,
+      });
+    }
 
     let sessions = data.sessions.sort((a, b) => a.startTime - b.startTime)
       .filter((session) => { return session.startTime != 0 && session.endTime != 0 && session.startTime > eloHistory.start });
@@ -230,35 +241,35 @@ const getplayerdata = (playerid) => {
       sessions = null;
     }
 
-    let enemies = history.filter(item => ["Death to", "Kill", "Teamkill", "Death to teamkill"].includes(item.type))
-    .reduce((acc, item) => {
-      let target = acc.find(t => t.name === item.player.name)
+    let enemies = history.filter(event => ["Death to", "Kill", "Teamkill", "Death to teamkill"].includes(event.type))
+    .reduce((acc, event) => {
+      let target = acc.find(t => t.name === event.player.name)
       if(target){
-        if(["Death to", "Kill"].includes(item.type)){
+        if(["Death to", "Kill"].includes(event.type)){
           target.events++;
-          target.eavarage = target.eavarage + item.player.elo;
-          if(item.type === "Kill") target.k++;
+          target.eavarage = target.eavarage + event.player.elo;
+          if(event.type === "Kill") target.k++;
           else target.d++;
 
-          target.netelo = target.netelo + item.elo;
+          target.netelo = target.netelo + event.elo;
         }
         else {
           target.teamevents++;
-          if(item.type === "Teamkill") target.tk++;
+          if(event.type === "Teamkill") target.tk++;
           else target.td++;
         }
 
       } else {
         acc.push({
-          name: item.player.name,
-          events: ["Death to", "Kill"].includes(item.type) ? 1 : 0,
-          teamevents: ["Teamkill", "Death to teamkill"].includes(item.type) ? 1 : 0,
-          eavarage: item.player.elo || 0,
-          k: item.type === "Kill" ? 1 : 0,
-          d: item.type === "Death to" ? 1 : 0,
-          tk: item.type === "Teamkill" ? 1 : 0,
-          td: item.type === "Death to teamkill" ? 1 : 0,
-          netelo: item.elo,
+          name: event.player.name,
+          events: ["Death to", "Kill"].includes(event.type) ? 1 : 0,
+          teamevents: ["Teamkill", "Death to teamkill"].includes(event.type) ? 1 : 0,
+          eavarage: event.player.elo || 0,
+          k: event.type === "Kill" ? 1 : 0,
+          d: event.type === "Death to" ? 1 : 0,
+          tk: event.type === "Teamkill" ? 1 : 0,
+          td: event.type === "Death to teamkill" ? 1 : 0,
+          netelo: event.elo,
         })
       }
       return acc;
@@ -277,17 +288,17 @@ const getplayerdata = (playerid) => {
       }
     });
     
-    let weapons = history.filter(item => ["Death to", "Kill"].includes(item.type))
-    .reduce((acc, item) => {
-      if(item.type === "Kill") {
-        acc.plane.kill_in[item.gun.from] = (acc.plane.kill_in[item.gun.from] || 0) + 1;
-        acc.plane.kill_to[item.gun.to] = (acc.plane.kill_to[item.gun.to] || 0) + 1;
-        acc.weapon.kill[item.gun.type] = (acc.weapon.kill[item.gun.type] || 0) + 1;
+    let weapons = history.filter(event => ["Death to", "Kill"].includes(event.type))
+    .reduce((acc, event) => {
+      if(event.type === "Kill") {
+        acc.plane.kill_in[event.gun.from] = (acc.plane.kill_in[event.gun.from] || 0) + 1;
+        acc.plane.kill_to[event.gun.to] = (acc.plane.kill_to[event.gun.to] || 0) + 1;
+        acc.weapon.kill[event.gun.type] = (acc.weapon.kill[event.gun.type] || 0) + 1;
       }
       else {
-        acc.plane.death_in[item.gun.to] = (acc.plane.death_in[item.gun.to] ||0) + 1;
-        acc.plane.death_by[item.gun.from] = (acc.plane.death_by[item.gun.from] || 0) + 1;
-        acc.weapon.death[item.gun.type] = (acc.weapon.death[item.gun.type] || 0) + 1;
+        acc.plane.death_in[event.gun.to] = (acc.plane.death_in[event.gun.to] ||0) + 1;
+        acc.plane.death_by[event.gun.from] = (acc.plane.death_by[event.gun.from] || 0) + 1;
+        acc.weapon.death[event.gun.type] = (acc.weapon.death[event.gun.type] || 0) + 1;
       }
       return acc
     },{
@@ -303,29 +314,60 @@ const getplayerdata = (playerid) => {
       }
     });
 
-    const tks = history.filter(item => item.type === 'Teamkill')
-    const tds = history.filter(item => item.type === 'Death to teamkill')
+    let avgdeltaelo = history.filter(event => ["Death to", "Kill"].includes(event.type))
+    .reduce((acc, event) => {
+      if(event.type === "Kill") {
+        acc.elo.victim += event.player.elo
+        acc.elo.deltavictim += event.elo*2 + event.player.elo - event.newElo
+        acc.type.kill +=1
+      }
+      else {
+        acc.elo.antagonist += event.player.elo 
+        acc.elo.deltaantagonist += -event.elo*2 + event.player.elo - event.newElo
+        acc.type.death +=1
+      }
+      return acc
+    },{
+      elo: {
+        victim: 0,
+        antagonist: 0,
+        deltavictim: 0,
+        deltaantagonist: 0,
+      },
+      type: {
+        kill: 0,
+        death: 0
+      }
+    });
 
-    let tksinfo = tks.reduce((acc, item) => {
-      let target = acc.find(t => t.name === item.player.name)
+    avgdeltaelo.elo.victim = Math.round(avgdeltaelo.elo.victim / avgdeltaelo.type.kill);
+    avgdeltaelo.elo.antagonist = Math.round(avgdeltaelo.elo.antagonist / avgdeltaelo.type.death);
+    avgdeltaelo.elo.deltavictim = Math.round(avgdeltaelo.elo.deltavictim / avgdeltaelo.type.kill);
+    avgdeltaelo.elo.deltaantagonist = Math.round(avgdeltaelo.elo.deltaantagonist / avgdeltaelo.type.death);
+
+    const tks = history.filter(event => event.type === 'Teamkill')
+    const tds = history.filter(event => event.type === 'Death to teamkill')
+
+    let tksinfo = tks.reduce((acc, event) => {
+      let target = acc.find(t => t.name === event.player.name)
       if(target){
         target.events++;
       } else {
         acc.push({
-          name: item.player.name,
+          name: event.player.name,
           events:1,
         })
       }
       return acc;
     },[]).sort((a, b) => b.events - a.events);
 
-    let tdsinfo = tds.reduce((acc, item) => {
-      let target = acc.find(t => t.name === item.player.name)
+    let tdsinfo = tds.reduce((acc, event) => {
+      let target = acc.find(t => t.name === event.player.name)
       if(target){
         target.events++;
       } else {
         acc.push({
-          name: item.player.name,
+          name: event.player.name,
           events:1,
         })
       }
@@ -351,8 +393,9 @@ const getplayerdata = (playerid) => {
       sessions: sessions,
       rank: data.isBanned ? null : data.rank,
       isBanned: data.isBanned,
-      tks: tks,
-      tds: tds,
+      tks: tks.length,
+      tds: tds.length,
+      avgdeltaelo: avgdeltaelo,
       tksinfo: tksinfo,
       tdsinfo: tdsinfo,
     }

@@ -158,7 +158,7 @@ const ranking = {
     if(/^\d{17}$/.test(this.searchterm)){
       console.log("steamid?", this.searchterm);
       this.__resultarray = this.__resultarray.filter((item) => {
-        return item.id === this.searchterm;
+        return item.id.toString() === this.searchterm;
       });
     }
     else if(this.searchterm){
@@ -605,7 +605,7 @@ const info = {
 
     //ParentId
     if (player.altParentId){
-      const main = ranking.__ranking.find((p) => p.id === player.altParentId);
+      const main = ranking.__ranking.find((p) => p.id.toString() === player.altParentId.toString());
       const parent_name = document.createElement("div");
       const parent_link = document.createElement("a");
       if(main){
@@ -662,7 +662,7 @@ const info = {
       const alts_body = document.createElement('div')
 
       for(let element of player.altIds){
-        const child = ranking.__ranking.find((p) => p.id === element);
+        const child = ranking.__ranking.find((p) => p.id.toString() === element.toString());
         const child_link = document.createElement("a");
         if(child){
           child_link.innerText = `${child.pilotNames[0]} (${Math.round(child.elo)})`;
@@ -687,10 +687,10 @@ const info = {
     }
 
     //Kills/Deaths
-    const kills = player.history.filter((e) => e.type === "Kill").length
-    const deaths = player.history.filter((e) => e.type === "Death to").length
-    const teamkills = player.tks.length
-    const teamdeaths = player.tds.length
+    const kills = player.avgdeltaelo.type.kill
+    const deaths = player.avgdeltaelo.type.death
+    const teamkills = player.tks
+    const teamdeaths = player.tds
     const kdbody = document.createElement('div')
     kdbody.innerHTML = `
       <table>
@@ -708,6 +708,23 @@ const info = {
       body: [kdbody],
     }, 'col-md-6')
     this.__contentrow.append(kd)
+
+    const avgbody = document.createElement('div')
+    avgbody.innerHTML = `
+      <table>
+        <tr><td>Victim avg. Elo:</td><td>${player.avgdeltaelo.elo.victim}</td></tr>
+        <tr><td>Killed by avg. Elo:</td><td>${player.avgdeltaelo.elo.antagonist}</td></tr>
+        <tr><td>Victim avg. Elo dif.:</td><td>${player.avgdeltaelo.elo.deltavictim}</td></tr>
+        <tr><td>Killed by avg. Elo dif.:</td><td>${player.avgdeltaelo.elo.deltaantagonist}</td></tr>
+        <tr><td>Dif. avg. Elo Killed by - Victim:</td><td>${player.avgdeltaelo.elo.antagonist - player.avgdeltaelo.elo.victim}</td></tr>
+      </table>
+    `;
+
+    const avg = this.__cardcreator({
+      header: "Avarage stats",
+      body: [avgbody],
+    }, 'col-md-6')
+    this.__contentrow.append(avg)
 
     //Weapons
     let weapons = [
@@ -867,17 +884,19 @@ const timelinecanvas = {
     $("#timeline-start").text(moment(sessions.start).toISOString(localtime));
     $("#timeline-end").text(moment(sessions.end).toISOString(localtime));
 
+    if(history.data?.length){
+      history.data.forEach((element , index, array)=> {
+        if(index > 0){
+          ctx.fillStyle = element.elo > array[index-1].elo ? "green" : "red";
+          ctx.fillRect( ...coord(element.time, element.elo), 1, 1 );
+        } else {
+          ctx.fillStyle = element.elo > 2000 ? "green" : "red";
+          ctx.fillRect(  ...coord(element.time, element.elo), 1, 1 );
+        }
+  
+      });
 
-    history.data.forEach((element , index, array)=> {
-      if(index > 0){
-        ctx.fillStyle = element.elo > array[index-1].elo ? "green" : "red";
-        ctx.fillRect( ...coord(element.time, element.elo), 1, 1 );
-      } else {
-        ctx.fillStyle = element.elo > 2000 ? "green" : "red";
-        ctx.fillRect(  ...coord(element.time, element.elo), 1, 1 );
-      }
-
-    });
+    }
     
     coord = function(start, end) {
       return [
