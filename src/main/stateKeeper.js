@@ -1,12 +1,13 @@
 import { screen } from 'electron';
-import settings from 'electron-settings';
+import Store from 'electron-store';
+const store = new Store();
 
 export const windowStateKeeper = async (windowName) => {
   let window, windowState;
 
   const setBounds = async () => {
-    if (await settings.has(`windowState.${windowName}`)) {
-      windowState = await settings.get(`windowState.${windowName}`);
+    if (store.has(`windowState.${windowName}`)) {
+      windowState = await store.get(`windowState.${windowName}`);
       const screens = screen.getAllDisplays()
         .find(screen => 
           screen.workArea.x <= windowState.x &&
@@ -35,7 +36,7 @@ export const windowStateKeeper = async (windowName) => {
     if (!windowState.isMaximized) {
       windowState = window.getBounds();
     }
-    await settings.set(`windowState.${windowName}`, windowState);
+    store.set(`windowState.${windowName}`, windowState);
   };
 
   var debouncetime = {}

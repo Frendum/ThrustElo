@@ -1,16 +1,14 @@
 'use strict';
-window.$ = window.jQuery = require('jquery')
-const electron = require('electron'),
-  { ipcRenderer } = electron,
-  moment = require('moment');
-
-import Chart from 'chart.js/auto'
+import $ from 'jquery';
+import moment from 'moment';
+import Chart from 'chart.js/auto';
 import zoomPlugin from 'chartjs-plugin-zoom';
-import 'bootstrap-icons/font/bootstrap-icons.css'
-Chart.register(zoomPlugin);
 import annotationPlugin from 'chartjs-plugin-annotation';
+
+Chart.register(zoomPlugin);
 Chart.register(annotationPlugin);
 Chart.defaults.borderColor = 'rgba(50,205,50,0.2)';
+
 const localtime = false
 
 let version = null;
@@ -592,8 +590,9 @@ const info = {
         <tr><td>Elo:</td><td>${Math.round(player.elo)}</td></tr>
         <tr><td>Peak:</td><td>${Math.round(player.eloHistory.peak)}</td></tr>
         <tr><td>Nadir:</td><td>${Math.round(player.eloHistory.nadir)}</td></tr>
-        <tr><td>SteamId:</td><td>${player.id}</td></tr>
         <tr><td>Aliases:</td><td>${pilotnames}</td></tr>
+        <tr><td>SteamId:</td><td>${player.id}</td></tr>
+        ${player.discordId ? `<tr><td>DiscordId:</td><td>${player.discordId}</td></tr>`:""}
       </table>
     `;
 
@@ -626,20 +625,6 @@ const info = {
       }, 'col-md-6')
       this.__contentrow.append(parent)
     }
-
-
-    //Discord
-    if (player.discordId) {
-      const discord_name = document.createElement("div");
-      discord_name.innerHTML = `<br><div class="spinner"></div><br>`;
-  
-      const discord = this.__cardcreator({
-        header: "Discord",
-        body: [discord_name],
-      }, 'col-md-6', 'discordcard')
-      this.__contentrow.append(discord)
-    }
-
 
     //Achievements
     if(player.achievements && player.achievements.length > 0){
@@ -760,32 +745,6 @@ const info = {
       body: [plbody],
     }, 'col-md-3')
     this.__contentrow.append(pl)
-  },
-  populateDiscord: async function () {
-    const content = await ipcRenderer.invoke("getdiscordinfo", player.discordId);
-    player.discord = content;
-
-    if (content) {
-      const discord_name = document.createElement("div");
-      discord_name.innerHTML = 
-      `<div style="font-weight: bold;">${content.display_name || content.username}</div>
-      <div>@${content.username}</div>`;
-      const discord = this.__cardcreator({
-        header: "Discord",
-        body: [discord_name],
-        avatar: content.avatarUrl || 'https://cdn.discordapp.com/embed/avatars/1.png',
-      }, 'col-md-6', 'discordcard')
-      $('#info #discordcard')[0].replaceWith(discord);
-    }
-    else{
-      const discord_name = document.createElement("div");
-      discord_name.innerHTML = `<div>Failed to retrieve Discord information.</div>`;
-      const discord = this.__cardcreator({
-        header: "Discord",
-        body: [discord_name],
-      }, 'col-md-6', 'discordcard')
-      $('#info #discordcard')[0].replaceWith(discord);
-    }
   },
   __cardcreator: (content, c, id) => {
     const col = document.createElement('div')
@@ -1065,12 +1024,6 @@ const changepage = (page, marked) => {
   if(page === "info"){
     timelinecanvas.update();
     window.scrollTo(0,0)
-
-    if(player.discordId && player.discord === undefined){
-      player.discord = null;
-      console.log("update discord");
-      info.populateDiscord()
-    }
   }
 
   scrollup.animate({top:'-30px'},300);
@@ -1188,11 +1141,7 @@ ipcRenderer.on('spinnertext', (e, [state, text = ""]) => {
 
 ipcRenderer.on('showmsg', (event, data) => { footerlist.addMsg(...data) });
 ipcRenderer.on('clearmsg', (event, id) => { footerlist.clearmsg(id) });
-ipcRenderer.invoke('getAppversion').then((result) => {
-  console.log('Version:', result);
-  version = result;
-  $('head title').text(`ThrustElo | v${result}`);
-});
+
 
 function debounce(func, wait = 500) {
   let timeout;
@@ -1206,8 +1155,13 @@ function debounce(func, wait = 500) {
 }
 
 function init() {
-  window.addEventListener('DOMContentLoaded', () => {
-    ipcRenderer.send('init')
+  window.addEventListener('DOMContentLoaded', async () => {
+    await ipcRenderer.invoke('getAppversion').then((result) => {
+      console.log('Version:', result);
+      version = result;
+      $('head title').text(`ThrustElo | v${result}`);
+      ipcRenderer.send('init')
+    });
   })
 }
 

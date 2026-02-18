@@ -1,6 +1,6 @@
 {
     "name": "thrustelo",
-    "version": "1.0.9",
+    "version": "1.0.10",
     "description": "Fly High, Rank Tight.",
     "main": "./out/main/index.js",
     "homepage": "https://github.com/Frendum/ThrustElo",
@@ -16,23 +16,20 @@
         "build:linux": "npm run build && electron-builder --linux"
     },
     "dependencies": {
-        "@electron-toolkit/preload": "^3.0.1",
+        "@electron-toolkit/preload": "^3.0.2",
         "@electron-toolkit/utils": "^4.0.0",
-        "@popperjs/core": "^2.11.8",
-        "bootstrap": "^5.3.3",
-        "bootstrap-icons": "^1.11.3",
-        "chart.js": "^4.4.5",
+        "bootstrap": "^5.3.8",
+        "chart.js": "^4.5.1",
         "chartjs-plugin-annotation": "^3.1.0",
-        "chartjs-plugin-zoom": "^2.0.1",
-        "electron-settings": "^4.0.4",
+        "chartjs-plugin-zoom": "^2.2.0",
         "jquery": "^3.7.1",
         "moment": "^2.30.1"
     },
     "devDependencies": {
-        "electron": "^38.2.0",
-        "electron-builder": "^26.0.12",
-        "electron-vite": "^4.0.1",
-        "vite": "^7.1.7",
-        "electron-store": "^11.0.0"
+        "electron": "^40.4.1",
+        "electron-builder": "^26.8.1",
+        "electron-store": "^11.0.2",
+        "electron-vite": "^5.0.0",
+        "vite": "^7.3.1"
     }
 }

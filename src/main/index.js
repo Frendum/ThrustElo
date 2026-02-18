@@ -383,7 +383,6 @@ const getplayerdata = (playerid) => {
       pilotName: data.pilotNames[0],
       pilotNames: data.pilotNames,
       discordId: data.discordId,
-      discord: undefined,
       isAlt: data.isAlt,
       altIds: data.altIds,
       altParentId: data.altParentId,
@@ -414,59 +413,6 @@ const hsapiget = async (resource) => {
     }
 
     const req = restapi.get(options, (res) => {
-      let chunks = [];
-      res.on('data', function(chunk) {
-        chunks.push(chunk);
-      }).on('end', function() {
-        let body = Buffer.concat(chunks);
-        try {
-          if(res.statusCode == 200 && res.headers['content-type'] == 'application/json; charset=utf-8'){
-            resolve(JSON.parse(body));
-          } else {
-            if(res.headers['content-type'] == 'text/plain; charset=UTF-8'){
-              throw new Error("Did not recieve a JSON response from the server: " + body.toString());
-            }
-            throw new Error("Did not recieve a JSON response from the server: unknown content-type");
-          }
-        } catch (error) {
-          reject(error);
-        }
-      })
-    });
-    
-    req.on('error', function(e) {
-      console.log('ERROR: ' + e.message);
-      reject(e);
-    });
-  });
-};
-
-const discordcache = [];
-ipcMain.handle('getdiscordinfo', async (event, discordId) => {
-  if(discordId){
-    try{
-      let data = discordcache.find((d) => d.id === discordId);
-      if(!data){
-        data = await discordapiget(discordId)
-        discordcache.push(data)
-      }
-      return data
-    } catch (e){
-      console.log("Discord API Error", e);
-      return null
-    }
-  }
-});
-
-const discordapiget = async (resource) => {
-  return new Promise((resolve, reject) => {
-    if(usetestapi) return reject("Discord API disabled");
-    const options = {
-      host: "avatar-cyan.vercel.app",
-      path: '/api/' + resource,
-    }
-
-    const req = https.get(options, (res) => {
       let chunks = [];
       res.on('data', function(chunk) {
         chunks.push(chunk);
